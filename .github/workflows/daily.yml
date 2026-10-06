@@ -1,0 +1,63 @@
+name: daily-short
+# Daily 9:16 short. 06:00 PT = 13:00 UTC (14:00 during PDT — close enough;
+# adjust the cron if you want it exact).
+on:
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Install Python deps
+        run: pip install -q -r pipeline/requirements.txt
+
+      - name: Restore b-roll cache
+        uses: actions/cache@v4
+        with:
+          path: pipeline/cache/clips
+          key: broll-${{ hashFiles('pipeline/cache/manifest.txt') }}
+          restore-keys: broll-
+
+      - name: Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PUBLISH_MODE: telegram_queue
+        run: python pipeline/run.py --mode daily
+
+      - name: Upload video artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-short-${{ github.run_id }}
+          path: pipeline/output/ainews_daily.mp4
+          retention-days: 30
+
+      - name: Commit state (dedupe log + defeats 60-day schedule auto-disable)
+        if: success()
+        run: |
+          git config user.name "pipeline-bot"
+          git config user.email "pipeline-bot@users.noreply.github.com"
+          git add pipeline/state.json
+          git diff --cached --quiet || git commit -m "daily run $(date -u +%F)"
+          git push
