@@ -1,0 +1,8 @@
+__pycache__/
+output/audio/
+output/segments/
+output/*.mp4
+output/*.wav
+cache/clips/
+token.pickle
+client_secrets.json
