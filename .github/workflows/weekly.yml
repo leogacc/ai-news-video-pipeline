@@ -1,8 +1,9 @@
 name: weekly-longform
-# Sunday 06:00 PT = 13:00 UTC. Renders the 16:9 weekly roundup (~30-60 min).
+# Sunday 08:00 PT = 15:00 UTC. Staggered 2h after the daily short so the two
+# never race on state.json (dedupe log). Renders the 16:9 weekly roundup (~30-60 min).
 on:
   schedule:
-    - cron: "0 13 * * 0"
+    - cron: "0 15 * * 0"
   workflow_dispatch:
 
 permissions:
