@@ -79,35 +79,46 @@ def pace(min_gap: float = 15.0):
     _last_call = time.time()
 
 
-def llm_json(prompt: str, tries: int = 6) -> dict:
-    import google.generativeai as genai
+def llm_json(prompt: str, tries: int = 8) -> dict:
+    """Direct REST call — one request per attempt, no hidden client-side
+    retry storms (the SDK's internal retries saturate the 5 req/min
+    free-tier quota by themselves)."""
+    import requests
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         sys.exit("[write] GEMINI_API_KEY is not set")
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel(
-        # NOTE (2026-10-06): gemini-2.5-flash is retired for new API keys;
-        # gemini-3.8-flash is the current free-tier flash model.
-        "gemini-3.8-flash",
-        generation_config={"response_mime_type": "application/json",
-                           "temperature": 0.7},
-    )
-    last = None
+    url = ("https://generativelanguage.googleapis.com/v1beta/"
+           "models/gemini-3.8-flash:generateContent")
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json",
+                             "temperature": 0.7},
+    }
+    last = RuntimeError("no attempts made")
     for attempt in range(tries):
-        pace()
+        pace(65)  # stay inside one 5/min quota window per call
         try:
-            resp = model.generate_content(prompt)
-            text = resp.text.strip()
-            # tolerate markdown fences
-            text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.M).strip()
+            r = requests.post(url, params={"key": key}, json=body, timeout=120)
+            if r.status_code in (429, 500, 503):
+                wait = 65 * (attempt + 1)
+                print(f"[write] Gemini {r.status_code}, waiting {wait}s "
+                      f"(attempt {attempt + 1}/{tries})")
+                time.sleep(wait)
+                last = RuntimeError(f"Gemini HTTP {r.status_code}: "
+                                    f"{r.text[:200]}")
+                continue
+            r.raise_for_status()
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            text = re.sub(r"^```(?:json)?|```$", "", text.strip(),
+                          flags=re.M).strip()
             return json.loads(text)
         except Exception as e:
             transient = ("429" in str(e) or "503" in str(e)
-                         or "ResourceExhausted" in type(e).__name__
-                         or "Unavailable" in type(e).__name__)
+                         or "RemoteDisconnected" in type(e).__name__
+                         or "Timeout" in type(e).__name__)
             if transient and attempt < tries - 1:
-                wait = 25 * (attempt + 1)
-                print(f"[write] transient API error, waiting {wait}s "
+                wait = 65 * (attempt + 1)
+                print(f"[write] transient error ({e}), waiting {wait}s "
                       f"(attempt {attempt + 1}/{tries})")
                 time.sleep(wait)
                 last = e
