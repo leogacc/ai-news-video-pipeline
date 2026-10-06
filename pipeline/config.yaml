@@ -1,0 +1,44 @@
+# All pipeline knobs in one place.
+project: ai-news-video-pipeline
+
+daily:
+  stories: 1
+  script_words: [150, 300]
+  width: 1080
+  height: 1920
+  fps: 30
+  crf: 21
+  preset: veryfast
+
+weekly:
+  stories: 6
+  script_words: [1500, 2500]
+  width: 1280
+  height: 720
+  fps: 30
+  crf: 22
+  preset: veryfast
+
+tts:
+  voice: af_sarah        # Kokoro fixed voice — keep constant for channel identity
+  lang_code: a
+  sample_rate: 24000
+  segment_gap_sec: 0.35
+
+captions:
+  whisper_model: base.en
+  max_words_per_line: 6
+  # alignment 5 = middle-center: keeps captions in the middle third,
+  # clear of TikTok/Reels/Shorts UI overlays at top and bottom.
+
+visuals:
+  clip_max_height: 720   # cap download size; upscaled at render
+  portrait_only: true
+
+qa:
+  max_grade_level: 9.5   # Flesch-Kincaid — the high-school requirement, enforced
+  duration_tolerance_sec: 3.0
+
+publish:
+  mode: telegram_queue   # telegram_queue | youtube | all
+  youtube_privacy: private   # stays private until Google OAuth verification passes
