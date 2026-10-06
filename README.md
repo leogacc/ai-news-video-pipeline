@@ -7,7 +7,7 @@ Hands-off pipeline that turns AI news into a daily short-form video (TikTok / Re
 | Decision | Choice | Why |
 |---|---|---|
 | **Host** | GitHub Actions (public repo), scheduled workflows | More hands-off than a VM: no patching, no idle-reclamation, no credit card, unlimited Linux minutes on public repos. Fallback: Oracle Cloud Always Free (2 OCPU / 12 GB ARM, free forever) runs the same scripts unchanged if you ever want a real VM. |
-| **Video stack** | Kokoro TTS + faster-whisper karaoke captions + Pexels/Pixabay b-roll + raw ffmpeg | $0, commercial-clean licenses (Apache-2.0 / MIT / LGPL + stock content licenses), runs on 2 vCPUs. A 60s short renders in ~5–10 min end-to-end. |
+| **Video stack** | Kokoro TTS + faster-whisper karaoke captions + Pixabay b-roll + raw ffmpeg | $0, commercial-clean licenses (Apache-2.0 / MIT / LGPL + stock content licenses), runs on 2 vCPUs. A 60s short renders in ~5–10 min end-to-end. |
 | **Publishing** | Phase 1: Telegram review queue. Phase 2: YouTube Data API, then IG Reels, then TikTok | TikTok needs a 2–6 week content audit and IG needs Meta app review before auto-posting works. The Telegram queue ships day one with zero approvals and doubles as the safety net forever. |
 
 ## How it flows
@@ -38,7 +38,7 @@ $0/month. Optional: X API pay-per-use (~$1/mo at this volume) if you add X later
 1. Create a **public** GitHub repo, push this folder. (Private also works: 2,000 min/mo free, this workload uses ~900–1,400.)
 2. Add repo secrets (Settings → Secrets → Actions):
    - `GEMINI_API_KEY` — free tier at Google AI Studio, drives Curator/Explainer/Scriptwriter/Fact-checker
-   - `PEXELS_API_KEY` — free at pexels.com/api (200 req/hr, plenty)
+   - `PIXABAY_API_KEY` — free at pixabay.com/api (Pexels paused new keys as of Oct 2026, so Pixabay is the primary b-roll source)
    - `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` — BotFather + your chat; this is the review queue and failure alerts
    - Phase 2 only: `YOUTUBE_CLIENT_SECRETS` (OAuth client JSON, base64)
 3. Drop 2–3 royalty-free music tracks (Pixabay Music / Mixkit) into `pipeline/assets/music/`.
@@ -56,7 +56,7 @@ pipeline/
   write.py           # Curator + Explainer + Scriptwriter + Fact-checker (Gemini)
   tts.py             # Producer (audio): Kokoro TTS per segment → narration_full.wav
   captions.py        # Producer (captions): faster-whisper → karaoke .ass
-  visuals.py         # Producer (visuals): Pexels/Pixabay b-roll cache, title-card fallback
+  visuals.py         # Producer (visuals): Pixabay b-roll cache, title-card fallback
   render.py          # Producer (render): two-pass ffmpeg → final mp4
   qa.py              # QA gate: duration, resolution, caption sanity, grade-level check
   publish.py         # Publisher: Telegram review queue (+ YouTube API, phase 2)
@@ -74,7 +74,7 @@ pipeline/
 
 - **One 1080×1920 master** covers TikTok, Reels, and Shorts — no per-platform re-render.
 - **Captions go in the middle third** (Alignment 5), never the bottom: platform UI covers the bottom ~20–35%.
-- **Commercial-clean only**: Kokoro (Apache-2.0), faster-whisper (MIT), ffmpeg (LGPL), Pexels/Pixabay content licenses, Pixabay/Mixkit music. Do not swap in Coqui XTTS (non-commercial) or edge-tts (ToS gray zone) on a monetized channel.
+- **Commercial-clean only**: Kokoro (Apache-2.0), faster-whisper (MIT), ffmpeg (LGPL), Pixabay content license. Do not swap in Coqui XTTS (non-commercial) or edge-tts (ToS gray zone) on a monetized channel.
 - **Whisper jargon**: AI news is full of model names; `base.en` minimum, `--language en` forced, initial prompt seeded with expected terms.
 - **GitHub schedule delays**: cron runs can slip 10–30 min at peak; harmless here.
 - **YouTube uploads via API start as private** until your OAuth app passes Google verification — by design, use the Telegram queue until then.
