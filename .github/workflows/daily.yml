@@ -53,7 +53,7 @@ jobs:
         with:
           name: daily-short-${{ github.run_id }}
           path: pipeline/output/ainews_daily.mp4
-          retention-days: 30
+          retention-days: 7
 
       - name: Commit state (dedupe log + defeats 60-day schedule auto-disable)
         if: success()
