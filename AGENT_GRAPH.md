@@ -50,7 +50,7 @@ SCOUT → CURATOR → EXPLAINER → SCRIPTWRITER → FACT-CHECKER → PRODUCER �
 Four sub-steps, no LLM:
 - **Voice:** Kokoro-82M (`af_sarah`, fixed for channel consistency), per-segment wavs → `narration_full.wav` + `timings.json`. ~1× real-time on 2 vCPUs.
 - **Captions:** faster-whisper `base.en`, word timestamps → karaoke `.ass` (active word highlighted, rest white, middle-third placement).
-- **Visuals:** Pexels API per `broll` keyword (Pixabay fallback), cached by keyword; no match → generated title card with slow Ken Burns zoom.
+- **Visuals:** Pixabay API per `broll` keyword (Pexels fallback if a key is configured), cached by keyword; no match → generated title card with slow Ken Burns zoom.
 - **Render:** two-pass ffmpeg — per-segment 1080×1920 clips → concat → captions burned in + ducked music bed + loudnorm → H.264 MP4. Weekly: 1280×720 16:9.
 
 ## 7. QA gate (deterministic — `qa.py`, blocking)
