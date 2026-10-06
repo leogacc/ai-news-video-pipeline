@@ -73,7 +73,9 @@ def llm_json(prompt: str) -> dict:
         sys.exit("[write] GEMINI_API_KEY is not set")
     genai.configure(api_key=key)
     model = genai.GenerativeModel(
-        "gemini-2.5-flash",
+        # NOTE (2026-10-06): gemini-2.5-flash is retired for new API keys;
+        # gemini-3.8-flash is the current free-tier flash model.
+        "gemini-3.8-flash",
         generation_config={"response_mime_type": "application/json",
                            "temperature": 0.7},
     )
