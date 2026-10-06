@@ -25,6 +25,9 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
+      - name: Install CPU-only torch (kokoro dependency)
+        run: pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+
       - name: Install Python deps
         run: pip install -q -r pipeline/requirements.txt
 
