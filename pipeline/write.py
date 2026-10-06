@@ -14,48 +14,23 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
 
-CURATOR_PROMPT = """You curate AI news for a faceless video channel aimed at high-school students.
-Rank these stories by (1) real-world impact, (2) visual explainability, (3) novelty.
-Skip pure funding-round press releases unless the amount changes the industry.
-Pick the top {n}.
-Stories:
-{stories}
-Return ONLY valid JSON: {{"picks": [{{"id": "<id>", "reason": "<one line>"}}]}}"""
-
-EXPLAINER_PROMPT = """Explain this AI news for a smart high-schooler.
-Rules: Flesch-Kincaid grade 9 or below. No unexplained jargon — every technical
-term gets a one-line everyday analogy first. Lead with why a teenager should care.
-120-180 words.
-Story: {title}
-Source summary: {summary}
-Return ONLY valid JSON: {{"brief": "...", "analogy": "...", "why_it_matters": "..."}}"""
-
-SHORT_SCRIPT_PROMPT = """Write a voiceover script for a 60-second vertical video from this brief.
-Rules:
-- 150-300 words total. First spoken line hooks in under 3 seconds — no intro, no greeting.
-- One idea per segment, 1-2 sentences each, conversational present tense.
-- End with a short follow CTA.
-- Every segment needs a "broll" keyword query (2-4 words) for stock footage.
-Brief: {brief}
+COMBINED_PROMPT = """You are the writer for a faceless AI-news video channel aimed at high-school students.
+Stories (id | title | source | summary):
+{listing}
+Do these three jobs in order:
+1. CURATOR — pick the {n} most important stories (real-world impact, visual explainability, novelty; skip pure funding press releases unless the amount changes the industry).
+2. EXPLAINER — for each pick, a 120-180 word brief a smart high-schooler can follow: Flesch-Kincaid grade 9 or below, every technical term gets a one-line everyday analogy first, lead with why a teenager should care.
+3. SCRIPTWRITER — {script_brief}
 Return ONLY valid JSON:
-{{"title": "<60 chars, honest, no clickbait lies", "hook": "first line",
-  "segments": [{{"text": "...", "broll": "..."}}],
+{{"picks": [{{"id": "<story id>", "reason": "<one line>"}}],
+  "title": "<video title, <60 chars, honest, no clickbait lies>",
+  "hook": "<first spoken line, hooks in under 3 seconds>",
+  "segments": [{{"text": "spoken narration", "broll": "stock footage query, 2-4 words"}}],
   "description": "video description with sources",
   "hashtags": ["#ai", "#ainews"]}}"""
 
-LONG_SCRIPT_PROMPT = """Write a 1500-2500 word voiceover script for a 10-minute YouTube video
-covering these stories as chapters.
-Rules:
-- Cold open: the week's biggest story in 30 seconds, hook first.
-- Chapters with spoken transitions ("meanwhile...", "here's why that matters...").
-- High-school reading level, analogies for jargon, recap + follow CTA at the end.
-- Every segment needs a "broll" keyword query (2-4 words) for stock footage.
-Stories:
-{briefs}
-Return ONLY valid JSON:
-{{"title": "...", "hook": "...",
-  "segments": [{{"text": "...", "broll": "..."}}],
-  "description": "...", "hashtags": ["#ai", "#ainews"]}}"""
+SHORT_BRIEF = """a 150-300 word voiceover script for a 60-second vertical video from the brief. First spoken line hooks in under 3 seconds — no intro, no greeting. One idea per segment, 1-2 sentences each, conversational present tense. End with a short follow CTA."""
+LONG_BRIEF = """a 1500-2500 word voiceover script for a 10-minute YouTube video covering the picked stories as chapters. Cold open with the biggest story in 30 seconds, hook first. Chapters with spoken transitions ("meanwhile...", "here's why that matters..."). Recap + follow CTA at the end."""
 
 FACTCHECK_PROMPT = """You are a fact-checker. Compare EVERY factual claim in this script
 against the source material below. Flag anything not supported, exaggerated, or
@@ -79,14 +54,30 @@ def pace(min_gap: float = 15.0):
     _last_call = time.time()
 
 
-def llm_json(prompt: str, tries: int = 8) -> dict:
-    """Direct REST call — one request per attempt, no hidden client-side
-    retry storms (the SDK's internal retries saturate the 5 req/min
-    free-tier quota by themselves)."""
+def _parse_json(text: str) -> dict:
+    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+    return json.loads(text)
+
+
+class _RateLimited(Exception):
+    def __init__(self, msg, retry_after=None):
+        super().__init__(msg)
+        self.retry_after = retry_after  # seconds until quota resets, if known
+
+
+def _retry_delay_seconds(msg: str) -> float | None:
+    m = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", msg)
+    if not m:
+        return None
+    h, mi, s = m.groups()
+    return int(h or 0) * 3600 + int(mi or 0) * 60 + float(s or 0)
+
+
+def _gemini_call(prompt: str) -> dict:
     import requests
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
-        sys.exit("[write] GEMINI_API_KEY is not set")
+        raise _RateLimited("no GEMINI_API_KEY")
     url = ("https://generativelanguage.googleapis.com/v1beta/"
            "models/gemini-3.8-flash:generateContent")
     body = {
@@ -94,36 +85,73 @@ def llm_json(prompt: str, tries: int = 8) -> dict:
         "generationConfig": {"responseMimeType": "application/json",
                              "temperature": 0.7},
     }
-    last = RuntimeError("no attempts made")
-    for attempt in range(tries):
-        pace(65)  # stay inside one 5/min quota window per call
+    r = requests.post(url, params={"key": key}, json=body, timeout=120)
+    if r.status_code in (429, 500, 503):
+        raise _RateLimited(f"Gemini HTTP {r.status_code}",
+                           retry_after=_retry_delay_seconds(r.text))
+    r.raise_for_status()
+    return _parse_json(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+
+
+def _pollinations_call(prompt: str) -> dict:
+    """Keyless fallback when Gemini's free quota is exhausted."""
+    import requests
+    r = requests.post(
+        "https://text.pollinations.ai/",
+        json={"messages": [{"role": "user", "content": prompt}],
+              "model": "openai", "private": True},
+        timeout=180)
+    if r.status_code in (429, 500, 503):
+        raise _RateLimited(f"pollinations HTTP {r.status_code}")
+    r.raise_for_status()
+    return _parse_json(r.text)
+
+
+def llm_json(prompt: str) -> dict:
+    """Gemini first (best quality). On quota exhaustion: try the keyless
+    fallback, then sleep until Gemini's quota resets and try again.
+    Patient up to ~5.5h (inside the 6h job cap) — a run that hits an empty
+    quota still completes the same day instead of failing.
+    One request per attempt, 65s+ spacing — never a retry storm."""
+    last: Exception = RuntimeError("no attempts made")
+    deadline = time.time() + 5.5 * 3600
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        # 1) Gemini, paced to the per-minute quota
+        pace(65)
         try:
-            r = requests.post(url, params={"key": key}, json=body, timeout=120)
-            if r.status_code in (429, 500, 503):
-                wait = 65 * (attempt + 1)
-                print(f"[write] Gemini {r.status_code}, waiting {wait}s "
-                      f"(attempt {attempt + 1}/{tries})")
+            return _gemini_call(prompt)
+        except _RateLimited as e:
+            print(f"[write] {e} (attempt {attempt}, gemini)")
+            last = e
+            if (e.retry_after and e.retry_after > 120
+                    and e.retry_after < deadline - time.time() - 600):
+                wait = e.retry_after + 60
+                print(f"[write] quota resets in ~{wait / 3600:.1f}h — "
+                      f"sleeping until then")
                 time.sleep(wait)
-                last = RuntimeError(f"Gemini HTTP {r.status_code}: "
-                                    f"{r.text[:200]}")
                 continue
-            r.raise_for_status()
-            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-            text = re.sub(r"^```(?:json)?|```$", "", text.strip(),
-                          flags=re.M).strip()
-            return json.loads(text)
         except Exception as e:
-            transient = ("429" in str(e) or "503" in str(e)
-                         or "RemoteDisconnected" in type(e).__name__
-                         or "Timeout" in type(e).__name__)
-            if transient and attempt < tries - 1:
-                wait = 65 * (attempt + 1)
-                print(f"[write] transient error ({e}), waiting {wait}s "
-                      f"(attempt {attempt + 1}/{tries})")
-                time.sleep(wait)
+            if "Timeout" in type(e).__name__:
+                print(f"[write] transient ({e}), retrying")
                 last = e
                 continue
             raise
+        # 2) keyless fallback while Gemini is exhausted
+        pace(30)
+        try:
+            return _pollinations_call(prompt)
+        except _RateLimited as e:
+            print(f"[write] {e} (attempt {attempt}, fallback)")
+            last = e
+        except Exception as e:
+            if "Timeout" in type(e).__name__:
+                print(f"[write] transient ({e}), retrying")
+                last = e
+            else:
+                raise
+        time.sleep(60)
     raise last
 
 
@@ -139,43 +167,37 @@ def main():
     listing = "\n".join(
         f"- id={s['id']} | {s['title']} ({s['source']}) :: {s['summary'][:250]}"
         for s in stories)
-    picks = llm_json(CURATOR_PROMPT.format(n=n, stories=listing))["picks"]
+    brief = SHORT_BRIEF if mode == "daily" else LONG_BRIEF
+    # Curator + Explainer + Scriptwriter in ONE call: the free tier only
+    # allows ~20 requests/day, so every call counts.
+    script = llm_json(COMBINED_PROMPT.format(n=n, listing=listing,
+                                            script_brief=brief))
     by_id = {s["id"]: s for s in stories}
-    chosen = [by_id[p["id"]] for p in picks if p["id"] in by_id]
-    if not chosen:
-        sys.exit("[write] curator returned unknown ids — aborting")
-
-    briefs = []
-    for s in chosen:
-        b = llm_json(EXPLAINER_PROMPT.format(title=s["title"], summary=s["summary"]))
-        briefs.append({"story": s, **b})
-
-    if mode == "daily":
-        script = llm_json(SHORT_SCRIPT_PROMPT.format(brief=briefs[0]["brief"]))
-    else:
-        joined = "\n\n".join(
-            f"STORY: {b['story']['title']}\n{b['brief']}" for b in briefs)
-        script = llm_json(LONG_SCRIPT_PROMPT.format(briefs=joined))
+    picks = [p for p in script.get("picks", []) if p["id"] in by_id]
+    if not picks:
+        sys.exit("[write] no valid story picks — aborting")
+    chosen = [by_id[p["id"]] for p in picks]
 
     words = sum(len(seg["text"].split()) for seg in script["segments"])
     if not (wmin <= words <= wmax + 200):
         print(f"[write] WARNING: script is {words} words (target {wmin}-{wmax})")
 
     sources_txt = "\n\n".join(
-        f"{b['story']['title']} ({b['story']['source']}, {b['story']['url']}): "
-        f"{b['story']['summary']}" for b in briefs)
+        f"{s['title']} ({s['source']}, {s['url']}): {s['summary']}"
+        for s in chosen)
     script_txt = "\n".join(seg["text"] for seg in script["segments"])
-    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt, script=script_txt))
+    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
+                                            script=script_txt))
     if check.get("verdict") != "ok":
         print("[write] FACT CHECK FAILED:")
         for i in check.get("issues", []):
             print("  -", i)
         sys.exit(1)
 
-    script["story_ids"] = [b["story"]["id"] for b in briefs]
+    script["story_ids"] = [s["id"] for s in chosen]
     script["sources"] = [
-        {"title": b["story"]["title"], "url": b["story"]["url"],
-         "source": b["story"]["source"]} for b in briefs]
+        {"title": s["title"], "url": s["url"], "source": s["source"]}
+        for s in chosen]
     (ROOT / "output" / "script.json").write_text(json.dumps(script, indent=2))
     print(f"[write] script ok ({words} words, {len(script['segments'])} segments)")
 
