@@ -52,7 +52,7 @@ jobs:
         with:
           name: weekly-longform-${{ github.run_id }}
           path: pipeline/output/ainews_weekly.mp4
-          retention-days: 30
+          retention-days: 7
 
       - name: Commit state (dedupe log + defeats 60-day schedule auto-disable)
         if: success()
