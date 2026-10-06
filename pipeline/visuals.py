@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""PRODUCER (visuals) — keyword b-roll via Pexels (Pixabay fallback), cached by
-keyword. No match -> generated title card (Ken Burns zoom applied at render).
--> output/visuals.json
+"""PRODUCER (visuals) — keyword b-roll via Pixabay (Pexels fallback if a key is
+present), cached by keyword. No match -> generated title card (Ken Burns zoom
+applied at render). -> output/visuals.json
 """
 import hashlib
 import json
@@ -105,7 +105,8 @@ def main():
         kind = "clip"
         if not dest.exists() or dest.stat().st_size < 10_000:
             url = None
-            for fn in (pexels_search, pixabay_search):
+            # Pixabay is primary (Pexels paused new API keys as of Oct 2026).
+            for fn in (pixabay_search, pexels_search):
                 try:
                     url = fn(q)
                 except Exception as e:
