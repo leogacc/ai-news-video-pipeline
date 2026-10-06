@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import re
+import time
 from pathlib import Path
 
 import yaml
@@ -66,7 +67,19 @@ Script:
 Return ONLY valid JSON: {{"verdict": "ok|fail", "issues": ["..."]}}"""
 
 
-def llm_json(prompt: str) -> dict:
+_last_call = 0.0
+
+
+def pace(min_gap: float = 15.0):
+    """Keep calls under the free tier's ~5 req/min limit."""
+    global _last_call
+    dt = time.time() - _last_call
+    if dt < min_gap:
+        time.sleep(min_gap - dt)
+    _last_call = time.time()
+
+
+def llm_json(prompt: str, tries: int = 6) -> dict:
     import google.generativeai as genai
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
@@ -79,11 +92,28 @@ def llm_json(prompt: str) -> dict:
         generation_config={"response_mime_type": "application/json",
                            "temperature": 0.7},
     )
-    resp = model.generate_content(prompt)
-    text = resp.text.strip()
-    # tolerate markdown fences
-    text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.M).strip()
-    return json.loads(text)
+    last = None
+    for attempt in range(tries):
+        pace()
+        try:
+            resp = model.generate_content(prompt)
+            text = resp.text.strip()
+            # tolerate markdown fences
+            text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.M).strip()
+            return json.loads(text)
+        except Exception as e:
+            transient = ("429" in str(e) or "503" in str(e)
+                         or "ResourceExhausted" in type(e).__name__
+                         or "Unavailable" in type(e).__name__)
+            if transient and attempt < tries - 1:
+                wait = 25 * (attempt + 1)
+                print(f"[write] transient API error, waiting {wait}s "
+                      f"(attempt {attempt + 1}/{tries})")
+                time.sleep(wait)
+                last = e
+                continue
+            raise
+    raise last
 
 
 def main():
