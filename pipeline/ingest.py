@@ -14,6 +14,8 @@ import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
+
 ROOT = Path(__file__).resolve().parent
 OUT_DIR = ROOT / "output"
 OUT_DIR.mkdir(exist_ok=True)
@@ -58,6 +60,22 @@ def fetch_gnews(query: str):
             "curated": False,
         })
     return stories
+
+
+def fetch_body(url: str, timeout: int = 30) -> str:
+    """Full article text via the Jina reader proxy (free, no key needed).
+    Returns '' on any failure — the RSS summary stays the fallback, and the
+    writer is told to keep claims headline-level for body-less stories."""
+    try:
+        r = requests.get("https://r.jina.ai/" + url,
+                         headers={"Accept": "text/plain"}, timeout=timeout)
+        if r.status_code != 200:
+            return ""
+        text = re.sub(r"\n{3,}", "\n\n", r.text).strip()
+        return text[:3000]
+    except Exception as e:
+        print(f"[scout] body fetch failed ({url[:60]}...): {e}")
+        return ""
 
 
 def load_override():
@@ -111,9 +129,18 @@ def main():
 
     curated = [s for s in load_override() if s["id"] not in seen]
     final = curated + uniq
+    # Full article text for the writer + fact-checker. The fact-check gate
+    # compares every claim against this material, so thin RSS snippets alone
+    # made runs with specific claims fail. Body fetch is best-effort:
+    # failures fall back to the summary (writer keeps claims headline-level).
+    for s in final[:12]:
+        if not s.get("body"):
+            s["body"] = fetch_body(s.get("url", ""))
     out = OUT_DIR / "stories.json"
     out.write_text(json.dumps(final[:12], indent=2))
-    print(f"[scout] {len(curated)} curated + {len(uniq)} fresh -> {out}")
+    n_body = sum(1 for s in final[:12] if s.get("body"))
+    print(f"[scout] {len(curated)} curated + {len(uniq)} fresh "
+          f"({n_body} with full text) -> {out}")
 
 
 if __name__ == "__main__":
