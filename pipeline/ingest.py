@@ -211,9 +211,14 @@ def main():
     final = curated + uniq
     # Fetch full article text so the writer works from substance, not
     # headlines (thin sources are what got the fact-check veto in run #5).
-    # HN stories carry direct publisher URLs; Google News redirect links
-    # can't be fetched reliably and are skipped.
-    for s in final[:12]:
+    # Google News redirect links can't be fetched reliably (fetch_article
+    # skips them instantly), so extraction candidates are the stories with
+    # direct publisher URLs — typically the Hacker News ones. Taking the
+    # first 12 stories naively only ever tries the Google News batch and
+    # yields zero article text (that's what killed run #8).
+    candidates = [s for s in final
+                  if "news.google.com" not in (s.get("url") or "")]
+    for s in candidates[:12]:
         if not s.get("article"):
             s["article"] = fetch_article(s.get("url", ""))
     out = OUT_DIR / "stories.json"
