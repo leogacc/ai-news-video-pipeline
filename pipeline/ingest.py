@@ -25,7 +25,17 @@ QUERIES = [
     "generative AI breakthrough",
 ]
 
+# Direct publisher feeds (real article URLs — Google News links are
+# redirect interstitials that can't be fetched reliably).
+DIRECT_FEEDS = [
+    ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
+    ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
+    ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
+    ("The Decoder", "https://www.the-decoder.com/feed/"),
+]
+
 MAX_PER_QUERY = 8
+MAX_PER_FEED = 6
 
 
 def norm_id(title: str) -> str:
@@ -86,25 +96,43 @@ def load_override():
     return fresh
 
 
+def fetch_feed(name: str, url: str, limit: int):
+    try:
+        feed = feedparser.parse(url)
+    except Exception as e:
+        print(f"[scout] feed failed ({name}): {e}")
+        return []
+    stories = []
+    for e in feed.entries[:limit]:
+        title = html.unescape(getattr(e, "title", "")).strip()
+        link = getattr(e, "link", "")
+        if not title or not link or "news.google.com" in link:
+            continue
+        stories.append({
+            "id": norm_id(title),
+            "title": title,
+            "summary": html.unescape(re.sub(r"<[^>]+>", " ", getattr(e, "summary", ""))).strip()[:600],
+            "url": link,
+            "source": name,
+            "published": getattr(e, "published", ""),
+            "curated": False,
+        })
+    return stories
+
+
 def fetch_article(url: str, max_chars: int = 6000) -> str:
-    """Full article text via the Jina reader (free, no key). Returns ""
-    on any failure — the writer then stays strictly within the
-    headline/summary instead of inventing details."""
-    if not url:
+    """Full article text via trafilatura (direct download + boilerplate
+    removal). Returns "" on any failure — the writer then stays strictly
+    within the headline/summary instead of inventing details."""
+    if not url or "news.google.com" in url:
         return ""
     try:
-        target = ("https://localhost:8080/http://r.jina.ai/http://" + url
-                  if not url.startswith("https://localhost:8080/http://r.jina.ai/http://") else url)
-        req = urllib.request.Request(
-            target, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            text = resp.read().decode("utf-8", "replace")
-        text = re.sub(r"!\[.*?\]\(.*?\)", "", text)   # drop images
-        text = re.sub(r"\n{3,}", "\n\n", text).strip()
-        # Jina returns the Google News interstitial for GN redirect links;
-        # that's useless as article text, so discard it.
-        if "news.google.com" in text[:500] and len(text) < 1500:
+        import trafilatura
+        downloaded = trafilatura.fetch_url(url)
+        if not downloaded:
             return ""
+        text = trafilatura.extract(downloaded, include_comments=False) or ""
+        text = re.sub(r"\n{3,}", "\n\n", text.strip())
         return text[:max_chars]
     except Exception as e:
         print(f"[scout] article fetch failed ({url[:60]}): {e}")
@@ -126,6 +154,8 @@ def main():
             stories.extend(fetch_gnews(q))
         except Exception as e:
             print(f"[scout] query failed ({q}): {e}")
+    for name, url in DIRECT_FEEDS:
+        stories.extend(fetch_feed(name, url, MAX_PER_FEED))
 
     # Dedupe within this batch, drop already-seen.
     uniq, batch_ids = [], set()
@@ -139,7 +169,9 @@ def main():
     final = curated + uniq
     # Fetch full article text so the writer works from substance, not
     # headlines (thin sources are what got the fact-check veto in run #5).
-    for s in final[:10]:
+    # Direct publisher links only — Google News redirect links can't be
+    # fetched reliably.
+    for s in final[:12]:
         if not s.get("article"):
             s["article"] = fetch_article(s.get("url", ""))
     out = OUT_DIR / "stories.json"
