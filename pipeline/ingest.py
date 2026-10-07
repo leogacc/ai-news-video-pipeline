@@ -134,6 +134,20 @@ def fetch_hn(query: str, limit: int):
     return stories
 
 
+# Hosts that never yield article text — skip before attempting extraction.
+NON_ARTICLE_HOSTS = ("youtube.com", "youtu.be", "github.com", "reddit.com",
+                     "x.com", "twitter.com", "vimeo.com", "tiktok.com",
+                     "instagram.com", "facebook.com")
+
+
+def fetchable(s) -> bool:
+    u = s.get("url", "")
+    if not u or "news.google.com" in u:
+        return False
+    host = urllib.parse.urlparse(u).netloc.lower()
+    return not any(h in host for h in NON_ARTICLE_HOSTS)
+
+
 def strip_html(raw: str) -> str:
     text = re.sub(r"<script.*?</script>", " ", raw, flags=re.S | re.I)
     text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
@@ -218,9 +232,10 @@ def main():
     # direct publisher URLs — typically the Hacker News ones. Taking the
     # first 12 stories naively only ever tries the Google News batch and
     # yields zero article text (that's what killed run #8).
-    candidates = [s for s in final
-                  if "news.google.com" not in (s.get("url") or "")]
-    for s in candidates[:12]:
+    candidates = [s for s in final if fetchable(s)]
+    for s in candidates[:15]:
+        if sum(1 for x in candidates if x.get("article")) >= 4:
+            break
         if not s.get("article"):
             s["article"] = fetch_article(s.get("url", ""))
     out = OUT_DIR / "stories.json"
