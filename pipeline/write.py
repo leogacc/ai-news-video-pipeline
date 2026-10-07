@@ -174,6 +174,33 @@ Segments:
 """
 
 
+REVISE_PROMPT = """You wrote a video script that a fact-checker reviewed. Fix ONLY the issues listed below — keep every other segment, word, and "broll" query exactly the same unless an issue forces a change. Do not add new facts.
+
+Issues:
+{issues}
+
+Current script JSON:
+{script_json}
+
+Output ONLY the corrected JSON with the same shape:
+{{"picks": [...], "title": "...", "hook": "...", "segments": [{{"text": "...", "broll": "..."}}], "description": "...", "hashtags": [...]}}"""
+
+
+def fact_check_ok(sources_txt: str, script: dict, deadline) -> bool:
+    """Run the fact-checker; on failure, print issues and return False."""
+    script_txt = "\n".join(seg["text"] for seg in script["segments"])
+    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
+                                            script=script_txt),
+                     deadline=deadline)
+    if check.get("verdict") == "ok":
+        return True
+    print("[write] FACT CHECK FAILED:")
+    for i in check.get("issues", []):
+        print("  -", i)
+    script["_fc_issues"] = check.get("issues", [])
+    return False
+
+
 def simplify_main():
     """SIMPLIFY=1: rewrite the existing script.json in simpler language and
     re-fact-check it against the same sources. Used by the run.py retry loop
@@ -197,13 +224,7 @@ def simplify_main():
         f"Summary: {s['summary'][:400]}\n"
         f"Article: {(s.get('article') or '[not available]')[:2500]}"
         for s in chosen)
-    script_txt = "\n".join(seg["text"] for seg in script["segments"])
-    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
-                                            script=script_txt))
-    if check.get("verdict") != "ok":
-        print("[write] FACT CHECK FAILED after simplify:")
-        for i in check.get("issues", []):
-            print("  -", i)
+    if not fact_check_ok(sources_txt, script, time.time() + 5.5 * 3600):
         sys.exit(1)
     (ROOT / "output" / "script.json").write_text(json.dumps(script, indent=2))
     words = sum(len(s["text"].split()) for s in script["segments"])
@@ -263,14 +284,28 @@ def main():
         f"Summary: {s['summary'][:400]}\n"
         f"Article: {(s.get('article') or '[not available]')[:2500]}"
         for s in chosen)
-    script_txt = "\n".join(seg["text"] for seg in script["segments"])
-    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
-                                            script=script_txt))
-    if check.get("verdict") != "ok":
-        print("[write] FACT CHECK FAILED:")
-        for i in check.get("issues", []):
-            print("  -", i)
-        sys.exit(1)
+    # Fact-check with revision loop: the checker returns specific, fixable
+    # issues (a reversed attribution killed run #11), so give the writer up
+    # to 2 revision tries before aborting the run.
+    for fc_try in range(1, 4):
+        if fact_check_ok(sources_txt, script, deadline):
+            break
+        if fc_try == 3:
+            sys.exit(1)
+        print(f"[write] revising script per fact-check (try {fc_try})")
+        rev = llm_json(REVISE_PROMPT.format(
+            issues="\n".join("- " + i for i in script.pop("_fc_issues")),
+            script_json=json.dumps(
+                {k: script[k] for k in
+                 ("picks", "title", "hook", "segments",
+                  "description", "hashtags") if k in script},
+                indent=2)), deadline=deadline)
+        if not rev.get("segments"):
+            print("[write] revision produced no segments — aborting")
+            sys.exit(1)
+        for k in ("title", "hook", "segments", "description", "hashtags"):
+            if k in rev:
+                script[k] = rev[k]
 
     script["story_ids"] = [s["id"] for s in chosen]
     script["sources"] = [
