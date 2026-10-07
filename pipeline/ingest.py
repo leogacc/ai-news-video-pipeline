@@ -70,27 +70,29 @@ def fetch_gnews(query: str):
 
 
 def load_override():
-    """Hand-picked stories (e.g. from the morning AI digest) win over RSS."""
-    p = ROOT / "input" / "stories_override.json"
-    if not p.exists():
-        return []
-    try:
-        data = json.loads(p.read_text())
-    except Exception:
-        return []
+    """Hand-picked stories (e.g. from the morning AI digest, or the daily
+    X/Twitter scan) win over RSS."""
     fresh = []
-    for s in data.get("stories", []):
-        ts = s.get("added_at", "")
+    for name in ("stories_override.json", "x_curated.json"):
+        p = ROOT / "input" / name
+        if not p.exists():
+            continue
         try:
-            age_h = (datetime.now(timezone.utc) -
-                     datetime.fromisoformat(ts)).total_seconds() / 3600
+            data = json.loads(p.read_text())
         except Exception:
-            age_h = 999
-        if age_h <= 36:  # stale overrides are ignored
-            s = dict(s)
-            s.setdefault("id", norm_id(s.get("title", "")))
-            s["curated"] = True
-            fresh.append(s)
+            continue
+        for s in data.get("stories", []):
+            ts = s.get("added_at", "")
+            try:
+                age_h = (datetime.now(timezone.utc) -
+                         datetime.fromisoformat(ts)).total_seconds() / 3600
+            except Exception:
+                age_h = 999
+            if age_h <= 36:  # stale overrides are ignored
+                s = dict(s)
+                s.setdefault("id", norm_id(s.get("title", "")))
+                s["curated"] = True
+                fresh.append(s)
     return fresh
 
 
