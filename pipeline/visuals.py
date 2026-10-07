@@ -105,13 +105,24 @@ def title_card(text: str, dest: Path, w: int, h: int):
 X_CLIP_MAX_SEC = 8  # third-party clips are trimmed short (fair-use heuristic)
 
 
-def fxtwitter_clip(status_url: str, dest: Path) -> bool:
-    """Download the video attached to an x.com post via the free fxtwitter
-    API, trimmed to X_CLIP_MAX_SEC. Returns True on success."""
+def fetch_trimmed_video(url: str, dest: Path) -> bool:
+    """Download a video URL and trim to X_CLIP_MAX_SEC (fair-use heuristic)."""
     import subprocess
+    tmp = dest.with_name(dest.stem + ".raw.mp4")
+    download(url, tmp)
+    subprocess.run(["ffmpeg", "-y", "-i", str(tmp), "-t",
+                    str(X_CLIP_MAX_SEC), "-c", "copy", str(dest)],
+                   check=True, capture_output=True)
+    tmp.unlink(missing_ok=True)
+    return dest.exists() and dest.stat().st_size > 10_000
+
+
+def fxtwitter_mp4(status_url: str):
+    """Resolve the direct mp4 URL of a video attached to an x.com post via
+    the free fxtwitter API. Returns None if there is none."""
     m = re.search(r"x\.com/([^/]+)/status/(\d+)", status_url)
     if not m:
-        return False
+        return None
     handle, sid = m.groups()
     d = requests.get(f"https://api.fxtwitter.com/{handle}/status/{sid}",
                      timeout=30).json()
@@ -121,7 +132,7 @@ def fxtwitter_clip(status_url: str, dest: Path) -> bool:
         if isinstance(o, dict):
             for k, v in o.items():
                 if k == "url" and isinstance(v, str) and ".mp4" in v:
-                    urls.append(v.split("?")[0])
+                    urls.append(v)
                 else:
                     walk(v)
         elif isinstance(o, list):
@@ -129,15 +140,46 @@ def fxtwitter_clip(status_url: str, dest: Path) -> bool:
                 walk(v)
 
     walk(d.get("tweet", {}).get("media", {}))
-    if not urls:
-        return False
-    tmp = dest.with_name(dest.stem + ".raw.mp4")
-    download(urls[0], tmp)
-    subprocess.run(["ffmpeg", "-y", "-i", str(tmp), "-t",
-                    str(X_CLIP_MAX_SEC), "-c", "copy", str(dest)],
-                   check=True, capture_output=True)
-    tmp.unlink(missing_ok=True)
-    return dest.exists() and dest.stat().st_size > 10_000
+    return urls[0] if urls else None
+
+
+def website_media(article_url: str):
+    """(kind, media_url) from the publisher's own page: og:video / twitter
+    player stream first, then og:image / twitter:image. (None, None) if the
+    page can't be fetched or declares no media."""
+    if not article_url or "x.com" in article_url \
+            or "news.google.com" in article_url:
+        return None, None
+    try:
+        r = requests.get(
+            article_url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                   "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                   "Chrome/126.0.0.0 Safari/537.36"},
+            timeout=30)
+        r.raise_for_status()
+        html = r.text
+    except Exception as e:
+        print(f"[visuals] article fetch failed for media: {e}")
+        return None, None
+
+    def meta(prop):
+        m = re.search(r'<meta[^>]*?(?:property|name)="' + prop + r'"[^>]*?>',
+                      html, re.I)
+        if not m:
+            return None
+        c = re.search(r'content="([^"]+)"', m.group(0), re.I)
+        return c.group(1) if c else None
+
+    for prop in ("og:video", "twitter:player:stream"):
+        u = meta(prop)
+        if u and ".mp4" in u:
+            return "clip", u
+    for prop in ("og:image", "twitter:image"):
+        u = meta(prop)
+        if u and not u.lower().endswith(".svg"):
+            return "photo", u
+    return None, None
 
 
 def main():
@@ -149,35 +191,79 @@ def main():
 
     visuals = []
 
-    # Pre-pass: for stories whose source is an x.com post, grab the post's
-    # own video once via fxtwitter (most relevant visual possible).
-    story_media = {}
+    # Pre-pass per story, in relevance order:
+    #   1. the story's own X post video (x_media_url, or x.com story URL)
+    #   2. the publisher's own page media (og:video / og:image)
+    # Later segments fall through to the Pixabay loop below.
+    story_assets = {}  # sid -> [(kind, local_path), ...]
     for sid, src in zip(script.get("story_ids", []),
                         script.get("sources", [])):
-        url = src.get("url", "")
-        if "x.com" in url and "/status/" in url and sid:
+        if not sid:
+            continue
+        assets = []
+        xurl = src.get("x_media_url") or ""
+        if not xurl:
+            u = src.get("url", "")
+            xurl = u if ("x.com" in u and "/status/" in u) else ""
+        if xurl:
             dest = CACHE / f"xmedia_{slug(sid)}.mp4"
-            if not dest.exists() or dest.stat().st_size < 10_000:
+            try:
+                if dest.stat().st_size < 10_000:
+                    raise FileNotFoundError
+            except FileNotFoundError:
                 try:
-                    if fxtwitter_clip(url, dest):
+                    mp4 = fxtwitter_mp4(xurl)
+                    if mp4 and fetch_trimmed_video(mp4, dest):
                         print(f"[visuals] story {sid[:8]}: X post video -> clip")
+                    else:
+                        dest.unlink(missing_ok=True)
                 except Exception as e:
-                    print(f"[visuals] fxtwitter failed for '{url[:60]}': {e}")
+                    print(f"[visuals] X video failed for '{xurl[:60]}': {e}")
                     dest.unlink(missing_ok=True)
             if dest.exists() and dest.stat().st_size >= 10_000:
-                story_media[sid] = str(dest)
+                assets.append(("clip", str(dest)))
+        wkind, wurl = website_media(src.get("url", ""))
+        if wurl:
+            ext = ".mp4" if wkind == "clip" else ".jpg"
+            dest = CACHE / f"sitemedia_{slug(sid)}{ext}"
+            try:
+                if dest.stat().st_size < 10_000:
+                    raise FileNotFoundError
+            except FileNotFoundError:
+                try:
+                    if wkind == "clip":
+                        ok = fetch_trimmed_video(wurl, dest)
+                    else:
+                        download(wurl, dest)
+                        ok = dest.stat().st_size > 10_000
+                    if ok:
+                        print(f"[visuals] story {sid[:8]}: publisher {wkind} -> {wkind}")
+                    else:
+                        dest.unlink(missing_ok=True)
+                except Exception as e:
+                    print(f"[visuals] publisher media failed for "
+                          f"'{src.get('url', '')[:60]}': {e}")
+                    dest.unlink(missing_ok=True)
+            if dest.exists() and dest.stat().st_size >= 10_000:
+                assets.append((wkind, str(dest)))
+        if assets:
+            story_assets[sid] = assets
 
-    seen_x_stories = set()
+    story_seg_n = {}
     for i, seg in enumerate(script["segments"]):
         sid = seg.get("story_id")
         dur = timings[i]["duration"] + CFG["tts"]["segment_gap_sec"]
-        # The story's own X video leads its first segment.
-        if sid and sid in story_media and sid not in seen_x_stories:
-            seen_x_stories.add(sid)
-            visuals.append({"segment": i, "kind": "clip",
-                            "path": story_media[sid], "duration": dur})
-            print(f"[visuals] seg {i}: X post video -> clip")
+        # Story-owned media first, in priority order across its segments.
+        assets = story_assets.get(sid, []) if sid else []
+        n = story_seg_n.get(sid, 0)
+        if n < len(assets):
+            story_seg_n[sid] = n + 1
+            kind, path = assets[n]
+            visuals.append({"segment": i, "kind": kind, "path": path,
+                            "duration": dur})
+            print(f"[visuals] seg {i}: story-owned {kind} -> {kind}")
             continue
+        story_seg_n[sid] = n + 1
         q = seg.get("broll") or "technology abstract"
         clip_dest = CACHE / f"{slug(q)}.mp4"
         photo_dest = CACHE / f"{slug(q)}.jpg"
