@@ -15,13 +15,13 @@ ROOT = Path(__file__).resolve().parent
 CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
 
 COMBINED_PROMPT = """You are the writer for a faceless AI-news video channel aimed at high-school students.
-Stories (id | title | source, then the full material you may use):
+Stories (id | title | source | summary):
 {listing}
 Do these three jobs in order:
 1. CURATOR — pick the {n} most important stories (real-world impact, visual explainability, novelty; skip pure funding press releases unless the amount changes the industry).
 2. EXPLAINER — for each pick, a 120-180 word brief a smart high-schooler can follow: Flesch-Kincaid grade 9 or below, every technical term gets a one-line everyday analogy first, lead with why a teenager should care.
 3. SCRIPTWRITER — {script_brief}
-GROUNDING RULE (non-negotiable): every factual claim — numbers, dates, names, quotes, study results — must come from the MATERIAL above. If a story's material is thin (headline/summary only), keep its claims headline-level. Never invent specifics to fill space.
+HONESTY RULE (non-negotiable): only state facts present in the provided material. Never invent numbers, quotes, dates, names, or specifics that aren't in the sources. If a story's material is thin (headline only), write a SHORTER script from just what's there rather than padding with invented detail — a 90-word honest script beats a 250-word fabricated one.
 Return ONLY valid JSON:
 {{"picks": [{{"id": "<story id>", "reason": "<one line>"}}],
   "title": "<video title, <60 chars, honest, no clickbait lies>",
@@ -156,15 +156,6 @@ def llm_json(prompt: str) -> dict:
     raise last
 
 
-def story_material(s: dict) -> str:
-    """Full article text when ingest fetched it, else the RSS summary.
-    The fact-checker compares every claim against exactly this material."""
-    body = (s.get("body") or "").strip()
-    if body:
-        return body[:2500]
-    return (s.get("summary") or "").strip()[:600]
-
-
 def main():
     mode = sys.argv[sys.argv.index("--mode") + 1] if "--mode" in sys.argv else "daily"
     n = CFG[mode]["stories"]
@@ -175,8 +166,9 @@ def main():
         sys.exit("[write] no stories to work with")
 
     listing = "\n\n".join(
-        f"--- id={s['id']} | {s['title']} ({s['source']})\n"
-        f"MATERIAL:\n{story_material(s)}"
+        f"--- STORY id={s['id']} ---\nTitle: {s['title']}\n"
+        f"Source: {s['source']}\nSummary: {s['summary'][:400]}\n"
+        f"Article text: {(s.get('article') or '[not available]')[:2500]}"
         for s in stories)
     brief = SHORT_BRIEF if mode == "daily" else LONG_BRIEF
     # Curator + Explainer + Scriptwriter in ONE call: the free tier only
@@ -184,53 +176,29 @@ def main():
     script = llm_json(COMBINED_PROMPT.format(n=n, listing=listing,
                                             script_brief=brief))
     by_id = {s["id"]: s for s in stories}
-
-    def validate(script_obj: dict) -> list:
-        picks = [p for p in script_obj.get("picks", []) if p["id"] in by_id]
-        return [by_id[p["id"]] for p in picks]
-
-    chosen = validate(script)
-    if not chosen:
+    picks = [p for p in script.get("picks", []) if p["id"] in by_id]
+    if not picks:
         sys.exit("[write] no valid story picks — aborting")
+    chosen = [by_id[p["id"]] for p in picks]
 
     words = sum(len(seg["text"].split()) for seg in script["segments"])
-    if not (wmin <= words <= wmax + 200):
+    if words > wmax + 200:
         print(f"[write] WARNING: script is {words} words (target {wmin}-{wmax})")
+    # (Shorter than wmin is fine: the honesty rule beats the word target.)
 
-    def factcheck(script_obj: dict, chosen_stories: list) -> dict:
-        sources_txt = "\n\n".join(
-            f"--- {s['title']} ({s['source']}, {s['url']})\n{story_material(s)}"
-            for s in chosen_stories)
-        script_txt = "\n".join(seg["text"] for seg in script_obj["segments"])
-        return llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
-                                               script=script_txt))
-
-    check = factcheck(script, chosen)
+    sources_txt = "\n\n".join(
+        f"{s['title']} ({s['source']}, {s['url']}):\n"
+        f"Summary: {s['summary'][:400]}\n"
+        f"Article: {(s.get('article') or '[not available]')[:2500]}"
+        for s in chosen)
+    script_txt = "\n".join(seg["text"] for seg in script["segments"])
+    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
+                                            script=script_txt))
     if check.get("verdict") != "ok":
-        # One repair pass: hand the issues back to the writer instead of
-        # aborting the whole run on the first draft's hallucinations.
-        issues = check.get("issues", [])
-        print("[write] fact-check flagged issues — one repair pass:")
-        for i in issues:
+        print("[write] FACT CHECK FAILED:")
+        for i in check.get("issues", []):
             print("  -", i)
-        repair_prompt = (COMBINED_PROMPT.format(n=n, listing=listing,
-                                               script_brief=brief)
-                         + "\n\nREVISION REQUIRED. The fact-checker flagged "
-                           "these issues in your draft:\n- "
-                         + "\n- ".join(issues)
-                         + "\nFix every issue: remove or soften unsupported "
-                           "claims. Keep the same JSON shape and story picks.")
-        script = llm_json(repair_prompt)
-        chosen = validate(script)
-        if not chosen:
-            sys.exit("[write] no valid story picks after repair — aborting")
-        check = factcheck(script, chosen)
-        if check.get("verdict") != "ok":
-            print("[write] FACT CHECK FAILED after repair:")
-            for i in check.get("issues", []):
-                print("  -", i)
-            sys.exit(1)
-        print("[write] repair pass accepted")
+        sys.exit(1)
 
     script["story_ids"] = [s["id"] for s in chosen]
     script["sources"] = [
