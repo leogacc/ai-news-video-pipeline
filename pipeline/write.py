@@ -18,7 +18,7 @@ COMBINED_PROMPT = """You are the writer for a faceless AI-news video channel aim
 Stories (id | title | source | summary):
 {listing}
 Do these three jobs in order:
-1. CURATOR — pick the {n} most important stories (real-world impact, visual explainability, novelty; skip pure funding press releases unless the amount changes the industry).
+1. CURATOR — pick the {n} most important stories (real-world impact, visual explainability, novelty; skip pure funding press releases unless the amount changes the industry). STRONGLY prefer stories with full article text included below — headline-only stories are a last resort.
 2. EXPLAINER — for each pick, a 120-180 word brief a smart high-schooler can follow: Flesch-Kincaid grade 9 or below, every technical term gets a one-line everyday analogy first, lead with why a teenager should care.
 3. SCRIPTWRITER — {script_brief}
 HONESTY RULE (non-negotiable): only state facts present in the provided material. Never invent numbers, quotes, dates, names, or specifics that aren't in the sources. If a story's material is thin (headline only), write a SHORTER script from just what's there rather than padding with invented detail — a 90-word honest script beats a 250-word fabricated one.
@@ -166,7 +166,9 @@ def main():
         sys.exit("[write] no stories to work with")
 
     listing = "\n\n".join(
-        f"--- STORY id={s['id']} ---\nTitle: {s['title']}\n"
+        f"--- STORY id={s['id']} "
+        f"[{'FULL ARTICLE' if s.get('article') else 'HEADLINE ONLY'}] ---\n"
+        f"Title: {s['title']}\n"
         f"Source: {s['source']}\nSummary: {s['summary'][:400]}\n"
         f"Article text: {(s.get('article') or '[not available]')[:2500]}"
         for s in stories)
