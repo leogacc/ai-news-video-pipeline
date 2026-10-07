@@ -108,14 +108,15 @@ def _pollinations_call(prompt: str) -> dict:
     return _parse_json(r.text)
 
 
-def llm_json(prompt: str) -> dict:
+def llm_json(prompt: str, deadline: float | None = None) -> dict:
     """Gemini first (best quality). On quota exhaustion: try the keyless
     fallback, then sleep until Gemini's quota resets and try again.
     Patient up to ~5.5h (inside the 6h job cap) — a run that hits an empty
     quota still completes the same day instead of failing.
-    One request per attempt, 65s+ spacing — never a retry storm."""
+    One request per attempt, 65s+ spacing — never a retry storm.
+    Pass a shared deadline when several calls must fit one budget."""
     last: Exception = RuntimeError("no attempts made")
-    deadline = time.time() + 5.5 * 3600
+    deadline = deadline or time.time() + 5.5 * 3600
     attempt = 0
     while time.time() < deadline:
         attempt += 1
@@ -175,10 +176,22 @@ def main():
     brief = SHORT_BRIEF if mode == "daily" else LONG_BRIEF
     # Curator + Explainer + Scriptwriter in ONE call: the free tier only
     # allows ~20 requests/day, so every call counts.
-    script = llm_json(COMBINED_PROMPT.format(n=n, listing=listing,
-                                            script_brief=brief))
+    # The keyless fallback can return malformed picks (wrong ids) when
+    # Gemini is rate-limited — that's transient, not fatal, so retry the
+    # combined call a few times within the shared deadline before giving up
+    # (a single bad-picks abort is what killed run #8).
+    deadline = time.time() + 5.5 * 3600
     by_id = {s["id"]: s for s in stories}
-    picks = [p for p in script.get("picks", []) if p["id"] in by_id]
+    script, picks = None, []
+    for combo_try in range(1, 4):
+        script = llm_json(COMBINED_PROMPT.format(n=n, listing=listing,
+                                                script_brief=brief),
+                         deadline=deadline)
+        picks = [p for p in script.get("picks", [])
+                 if isinstance(p, dict) and p.get("id") in by_id]
+        if picks:
+            break
+        print(f"[write] no valid story picks (try {combo_try}) — retrying")
     if not picks:
         sys.exit("[write] no valid story picks — aborting")
     chosen = [by_id[p["id"]] for p in picks]
