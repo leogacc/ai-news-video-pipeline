@@ -72,8 +72,11 @@ def main():
 
     if failures:
         print(f"[qa] BLOCKED: {failures}")
+    else:
+        print("[qa] all checks passed")
+    (ROOT / "output" / "qa.json").write_text(json.dumps({"failures": failures}))
+    if failures:
         sys.exit(1)
-    print("[qa] all checks passed")
 
 
 if __name__ == "__main__":
