@@ -20,17 +20,17 @@ Stories (id | title | source | summary):
 Do these three jobs in order:
 1. CURATOR — pick the {n} most important stories (real-world impact, visual explainability, novelty; skip pure funding press releases unless the amount changes the industry). STRONGLY prefer stories with full article text included below — headline-only stories are a last resort.
 2. EXPLAINER — for each pick, a 120-180 word brief a smart high-schooler can follow: Flesch-Kincaid grade 8 or below, every technical term gets a one-line everyday analogy first, lead with why a teenager should care.
-3. SCRIPTWRITER — {script_brief}
+3. SCRIPTWRITER — {script_brief} Group segments by story in picks order; every segment carries the story_id of the story it covers. Each segment's "broll" is a 3-5 word stock-footage query naming the CONCRETE subject on screen — a person, company, place, or object (e.g. "Elon Musk portrait", "SpaceX rocket launch", "chalkboard math equations", "Hong Kong skyline night"). Never generic filler like "technology", "future", "student studying", "abstract".
 HONESTY RULE (non-negotiable): only state facts present in the provided material. Never invent numbers, quotes, dates, names, or specifics that aren't in the sources. If a story's material is thin (headline only), write a SHORTER script from just what's there rather than padding with invented detail — a 90-word honest script beats a 250-word fabricated one.
 Return ONLY valid JSON:
 {{"picks": [{{"id": "<story id>", "reason": "<one line>"}}],
   "title": "<video title, <60 chars, honest, no clickbait lies>",
   "hook": "<first spoken line, hooks in under 3 seconds>",
-  "segments": [{{"text": "spoken narration", "broll": "stock footage query, 2-4 words"}}],
+  "segments": [{{"text": "spoken narration", "broll": "concrete stock-footage query naming the subject, 3-5 words", "story_id": "<id of the story this segment covers>"}}],
   "description": "video description with sources",
   "hashtags": ["#ai", "#ainews"]}}"""
 
-SHORT_BRIEF = """a 150-300 word voiceover script for a 60-second vertical video from the brief. First spoken line hooks in under 3 seconds — no intro, no greeting. One idea per segment, 1-2 sentences each, conversational present tense. End with a short follow CTA."""
+SHORT_BRIEF = """a 200-350 word voiceover script for a 90-second vertical video covering the 5 picked stories rapid-fire. First spoken line hooks in under 3 seconds — no intro, no greeting. Each story gets 1-2 segments: one striking fact plus one line on why it matters, conversational present tense. End with a short follow CTA."""
 LONG_BRIEF = """a 1500-2500 word voiceover script for a 10-minute YouTube video covering the picked stories as chapters. Cold open with the biggest story in 30 seconds, hook first. Chapters with spoken transitions ("meanwhile...", "here's why that matters..."). Recap + follow CTA at the end."""
 
 FACTCHECK_PROMPT = """You are a fact-checker. Compare EVERY factual claim in this script
@@ -162,19 +162,19 @@ SIMPLIFY_PROMPT = """Rewrite these video narration segments in simpler language 
 Rules:
 - Keep the SAME number of segments in the SAME order.
 - Keep every fact exactly the same — change wording only. Add no new facts, drop no facts.
-- Keep each segment's "broll" query EXACTLY as-is (character for character).
+- Keep each segment's "broll" query and "story_id" EXACTLY as-is (character for character).
 - Use short sentences (under 18 words each) and everyday words. Flesch-Kincaid grade 8 or below.
 - Keep the total word count within 10% of the original.
 
 Output ONLY this JSON, nothing else:
-{{"segments": [{{"text": "...", "broll": "..."}}, ...]}}
+{{"segments": [{{"text": "...", "broll": "...", "story_id": "..."}}, ...]}}
 
-Segments:
+Segments (story_id shown for preservation, do not change):
 {segments}
 """
 
 
-REVISE_PROMPT = """You wrote a video script that a fact-checker reviewed. Fix ONLY the issues listed below — keep every other segment, word, and "broll" query exactly the same unless an issue forces a change. Do not add new facts.
+REVISE_PROMPT = """You wrote a video script that a fact-checker reviewed. Fix ONLY the issues listed below — keep every other segment, word, "broll" query, and "story_id" exactly the same unless an issue forces a change. Do not add new facts.
 
 Issues:
 {issues}
@@ -183,7 +183,7 @@ Current script JSON:
 {script_json}
 
 Output ONLY the corrected JSON with the same shape:
-{{"picks": [...], "title": "...", "hook": "...", "segments": [{{"text": "...", "broll": "..."}}], "description": "...", "hashtags": [...]}}"""
+{{"picks": [...], "title": "...", "hook": "...", "segments": [{{"text": "...", "broll": "...", "story_id": "..."}}], "description": "...", "hashtags": [...]}}"""
 
 
 def fact_check_ok(sources_txt: str, script: dict, deadline) -> bool:
@@ -210,15 +210,18 @@ def simplify_main():
                json.loads((ROOT / "output" / "stories.json").read_text())}
     chosen = [stories[i] for i in script.get("story_ids", []) if i in stories]
     segs_txt = "\n".join(
-        f'{i + 1}. text="{s["text"]}" broll="{s["broll"]}"'
+        f'{i + 1}. story_id="{s.get("story_id", "")}" '
+        f'text="{s["text"]}" broll="{s["broll"]}"'
         for i, s in enumerate(script["segments"]))
     new = llm_json(SIMPLIFY_PROMPT.format(segments=segs_txt))
     segs = new.get("segments") or []
     if len(segs) != len(script["segments"]) or \
             not all(s.get("text") and s.get("broll") for s in segs):
         sys.exit("[write] simplify produced invalid segments — aborting")
-    script["segments"] = [{"text": s["text"], "broll": s["broll"]}
-                           for s in segs]
+    script["segments"] = [{"text": s["text"], "broll": s["broll"],
+                           "story_id": s.get("story_id")
+                           or script["segments"][i].get("story_id")}
+                          for i, s in enumerate(segs)]
     sources_txt = "\n\n".join(
         f"{s['title']} ({s['source']}, {s['url']}):\n"
         f"Summary: {s['summary'][:400]}\n"
@@ -303,9 +306,19 @@ def main():
         if not rev.get("segments"):
             print("[write] revision produced no segments — aborting")
             sys.exit(1)
-        for k in ("title", "hook", "segments", "description", "hashtags"):
+        for k in ("title", "hook", "description", "hashtags"):
             if k in rev:
                 script[k] = rev[k]
+        # preserve story_id per segment (fall back to original by index)
+        old_segs = script["segments"]
+        new_segs = rev["segments"]
+        if len(new_segs) != len(old_segs):
+            print("[write] revision changed segment count — aborting")
+            sys.exit(1)
+        script["segments"] = [
+            {"text": s.get("text", ""), "broll": s.get("broll", ""),
+             "story_id": s.get("story_id") or old_segs[i].get("story_id")}
+            for i, s in enumerate(new_segs)]
 
     script["story_ids"] = [s["id"] for s in chosen]
     script["sources"] = [
