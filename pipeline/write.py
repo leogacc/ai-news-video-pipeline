@@ -322,7 +322,8 @@ def main():
 
     script["story_ids"] = [s["id"] for s in chosen]
     script["sources"] = [
-        {"title": s["title"], "url": s["url"], "source": s["source"]}
+        {"title": s["title"], "url": s["url"], "source": s["source"],
+         "x_media_url": s.get("x_media_url")}
         for s in chosen]
     (ROOT / "output" / "script.json").write_text(json.dumps(script, indent=2))
     print(f"[write] script ok ({words} words, {len(script['segments'])} segments)")
