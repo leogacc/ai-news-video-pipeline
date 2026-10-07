@@ -19,7 +19,7 @@ Stories (id | title | source | summary):
 {listing}
 Do these three jobs in order:
 1. CURATOR — pick the {n} most important stories (real-world impact, visual explainability, novelty; skip pure funding press releases unless the amount changes the industry). STRONGLY prefer stories with full article text included below — headline-only stories are a last resort.
-2. EXPLAINER — for each pick, a 120-180 word brief a smart high-schooler can follow: Flesch-Kincaid grade 9 or below, every technical term gets a one-line everyday analogy first, lead with why a teenager should care.
+2. EXPLAINER — for each pick, a 120-180 word brief a smart high-schooler can follow: Flesch-Kincaid grade 8 or below, every technical term gets a one-line everyday analogy first, lead with why a teenager should care.
 3. SCRIPTWRITER — {script_brief}
 HONESTY RULE (non-negotiable): only state facts present in the provided material. Never invent numbers, quotes, dates, names, or specifics that aren't in the sources. If a story's material is thin (headline only), write a SHORTER script from just what's there rather than padding with invented detail — a 90-word honest script beats a 250-word fabricated one.
 Return ONLY valid JSON:
@@ -157,8 +157,65 @@ def llm_json(prompt: str, deadline: float | None = None) -> dict:
     raise last
 
 
+SIMPLIFY_PROMPT = """Rewrite these video narration segments in simpler language a 13-year-old can easily follow.
+
+Rules:
+- Keep the SAME number of segments in the SAME order.
+- Keep every fact exactly the same — change wording only. Add no new facts, drop no facts.
+- Keep each segment's "broll" query EXACTLY as-is (character for character).
+- Use short sentences (under 18 words each) and everyday words. Flesch-Kincaid grade 8 or below.
+- Keep the total word count within 10% of the original.
+
+Output ONLY this JSON, nothing else:
+{{"segments": [{{"text": "...", "broll": "..."}}, ...]}}
+
+Segments:
+{segments}
+"""
+
+
+def simplify_main():
+    """SIMPLIFY=1: rewrite the existing script.json in simpler language and
+    re-fact-check it against the same sources. Used by the run.py retry loop
+    when QA blocks only on reading level."""
+    script = json.loads((ROOT / "output" / "script.json").read_text())
+    stories = {s["id"]: s for s in
+               json.loads((ROOT / "output" / "stories.json").read_text())}
+    chosen = [stories[i] for i in script.get("story_ids", []) if i in stories]
+    segs_txt = "\n".join(
+        f'{i + 1}. text="{s["text"]}" broll="{s["broll"]}"'
+        for i, s in enumerate(script["segments"]))
+    new = llm_json(SIMPLIFY_PROMPT.format(segments=segs_txt))
+    segs = new.get("segments") or []
+    if len(segs) != len(script["segments"]) or \
+            not all(s.get("text") and s.get("broll") for s in segs):
+        sys.exit("[write] simplify produced invalid segments — aborting")
+    script["segments"] = [{"text": s["text"], "broll": s["broll"]}
+                           for s in segs]
+    sources_txt = "\n\n".join(
+        f"{s['title']} ({s['source']}, {s['url']}):\n"
+        f"Summary: {s['summary'][:400]}\n"
+        f"Article: {(s.get('article') or '[not available]')[:2500]}"
+        for s in chosen)
+    script_txt = "\n".join(seg["text"] for seg in script["segments"])
+    check = llm_json(FACTCHECK_PROMPT.format(sources=sources_txt,
+                                            script=script_txt))
+    if check.get("verdict") != "ok":
+        print("[write] FACT CHECK FAILED after simplify:")
+        for i in check.get("issues", []):
+            print("  -", i)
+        sys.exit(1)
+    (ROOT / "output" / "script.json").write_text(json.dumps(script, indent=2))
+    words = sum(len(s["text"].split()) for s in script["segments"])
+    print(f"[write] simplified script ok ({words} words, "
+          f"{len(script['segments'])} segments)")
+
+
 def main():
     mode = sys.argv[sys.argv.index("--mode") + 1] if "--mode" in sys.argv else "daily"
+    if os.environ.get("SIMPLIFY") == "1":
+        simplify_main()
+        return
     n = CFG[mode]["stories"]
     wmin, wmax = CFG[mode]["script_words"]
 
