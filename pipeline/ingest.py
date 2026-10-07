@@ -10,6 +10,7 @@ import hashlib
 import html
 import json
 import re
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -25,17 +26,14 @@ QUERIES = [
     "generative AI breakthrough",
 ]
 
-# Direct publisher feeds (real article URLs — Google News links are
-# redirect interstitials that can't be fetched reliably).
-DIRECT_FEEDS = [
-    ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
-    ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
-    ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
-    ("The Decoder", "https://www.the-decoder.com/feed/"),
-]
+# Hacker News (Algolia API): free, no key, server-friendly. Gives direct
+# publisher URLs + points as a quality signal — the reliable way to get
+# fetchable article links, since Google News redirect URLs can't be
+# resolved and publisher RSS feeds block datacenter IPs.
+HN_QUERIES = ["AI", "artificial intelligence", "LLM"]
 
 MAX_PER_QUERY = 8
-MAX_PER_FEED = 6
+MAX_PER_HN_QUERY = 8
 
 
 def norm_id(title: str) -> str:
@@ -96,47 +94,91 @@ def load_override():
     return fresh
 
 
-def fetch_feed(name: str, url: str, limit: int):
+def fetch_hn(query: str, limit: int):
+    """Top recent AI stories from Hacker News (Algolia API)."""
     try:
-        feed = feedparser.parse(url)
+        since = int(time.time()) - 3 * 86400
+        params = urllib.parse.urlencode({
+            "query": query, "tags": "story", "hitsPerPage": limit,
+            "numericFilters": f"created_at_i>{since},points>15",
+        })
+        req = urllib.request.Request(
+            "https://hn.algolia.com/api/v1/search?" + params,
+            headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.load(resp)
     except Exception as e:
-        print(f"[scout] feed failed ({name}): {e}")
+        print(f"[scout] HN query failed ({query}): {e}")
         return []
     stories = []
-    for e in feed.entries[:limit]:
-        title = html.unescape(getattr(e, "title", "")).strip()
-        link = getattr(e, "link", "")
-        if not title or not link or "news.google.com" in link:
+    for h in data.get("hits", []):
+        title = html.unescape(h.get("title") or "").strip()
+        link = (h.get("url") or "").strip()
+        if not title or not link:
             continue
+        if not link.startswith(("http://", "https://")):
+            continue
+        domain = urllib.parse.urlparse(link).netloc.replace("www.", "")
         stories.append({
-            "id": norm_id(title),
+            "id": norm_id(title + link),
             "title": title,
-            "summary": html.unescape(re.sub(r"<[^>]+>", " ", getattr(e, "summary", ""))).strip()[:600],
+            "summary": f"HN discussion ({h.get('points', 0)} points, "
+                       f"{h.get('num_comments', 0)} comments).",
             "url": link,
-            "source": name,
-            "published": getattr(e, "published", ""),
+            "source": f"Hacker News via {domain}",
+            "published": h.get("created_at", ""),
             "curated": False,
         })
     return stories
 
 
+def strip_html(raw: str) -> str:
+    text = re.sub(r"<script.*?</script>", " ", raw, flags=re.S | re.I)
+    text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html.unescape(text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def fetch_article(url: str, max_chars: int = 6000) -> str:
-    """Full article text via trafilatura (direct download + boilerplate
-    removal). Returns "" on any failure — the writer then stays strictly
-    within the headline/summary instead of inventing details."""
+    """Full article text. Tries trafilatura (direct) first, then Microlink
+    (server-side fetch + extraction, free tier) as fallback. Returns ""
+    on any failure — the writer then stays strictly within the
+    headline/summary instead of inventing details."""
     if not url or "news.google.com" in url:
         return ""
+    text = ""
     try:
         import trafilatura
         downloaded = trafilatura.fetch_url(url)
-        if not downloaded:
-            return ""
-        text = trafilatura.extract(downloaded, include_comments=False) or ""
-        text = re.sub(r"\n{3,}", "\n\n", text.strip())
-        return text[:max_chars]
-    except Exception as e:
-        print(f"[scout] article fetch failed ({url[:60]}): {e}")
-        return ""
+        if downloaded:
+            text = trafilatura.extract(downloaded, include_comments=False) or ""
+    except Exception:
+        pass
+    if len(text.strip()) < 500:
+        # Microlink fallback: their servers fetch the page, we extract
+        # the main/article/body content and strip tags ourselves.
+        try:
+            for sel in ("main", "article", "body"):
+                params = urllib.parse.urlencode({
+                    "url": url, "data.text.selector": sel,
+                    "data.text.type": "text"})
+                req = urllib.request.Request(
+                    "https://api.microlink.io/?" + params,
+                    headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    data = json.load(resp)
+                chunk = ((data.get("data") or {}).get("text")) or ""
+                if len(chunk) > len(text):
+                    text = strip_html(chunk)
+                if len(text.strip()) >= 500:
+                    break
+        except Exception as e:
+            print(f"[scout] microlink failed ({url[:60]}): {e}")
+    text = re.sub(r"\n{3,}", "\n\n", text.strip())
+    return text[:max_chars]
 
 
 def main():
@@ -154,8 +196,8 @@ def main():
             stories.extend(fetch_gnews(q))
         except Exception as e:
             print(f"[scout] query failed ({q}): {e}")
-    for name, url in DIRECT_FEEDS:
-        stories.extend(fetch_feed(name, url, MAX_PER_FEED))
+    for q in HN_QUERIES:
+        stories.extend(fetch_hn(q, MAX_PER_HN_QUERY))
 
     # Dedupe within this batch, drop already-seen.
     uniq, batch_ids = [], set()
@@ -169,8 +211,8 @@ def main():
     final = curated + uniq
     # Fetch full article text so the writer works from substance, not
     # headlines (thin sources are what got the fact-check veto in run #5).
-    # Direct publisher links only — Google News redirect links can't be
-    # fetched reliably.
+    # HN stories carry direct publisher URLs; Google News redirect links
+    # can't be fetched reliably and are skipped.
     for s in final[:12]:
         if not s.get("article"):
             s["article"] = fetch_article(s.get("url", ""))
