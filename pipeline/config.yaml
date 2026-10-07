@@ -2,8 +2,8 @@
 project: ai-news-video-pipeline
 
 daily:
-  stories: 1
-  script_words: [150, 300]
+  stories: 5
+  script_words: [200, 350]
   width: 1080
   height: 1920
   fps: 30
