@@ -23,7 +23,8 @@ tts:
   voice: af_sarah        # Kokoro fixed voice — keep constant for channel identity
   lang_code: a
   sample_rate: 24000
-  segment_gap_sec: 0.35
+  speed: 1.25           # reference pacing: ~190wpm, near-zero dead air
+  segment_gap_sec: 0.2
 
 captions:
   whisper_model: base.en
