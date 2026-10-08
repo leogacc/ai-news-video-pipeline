@@ -9,6 +9,7 @@ import json
 import os
 import re
 import textwrap
+import time
 from pathlib import Path
 
 import requests
@@ -266,6 +267,24 @@ def website_media(article_url: str):
     return None, None
 
 
+def download_retry(url: str, dest: Path, tries: int = 4) -> bool:
+    """Download with exponential backoff. Wikimedia rate-limits thumbnail
+    fetches (HTTP 429); the file is usually fine a few seconds later."""
+    for attempt in range(tries):
+        try:
+            download(url, dest)
+            if dest.stat().st_size > 2000:
+                return True
+            dest.unlink(missing_ok=True)
+            return False
+        except Exception as e:
+            wait = 2 ** attempt
+            print(f"[visuals] download attempt {attempt + 1}/{tries} failed "
+                  f"({e}); retrying in {wait}s")
+            time.sleep(wait)
+    return False
+
+
 def norm_w(w: str) -> str:
     return re.sub(r"[^a-z0-9]", "", w.lower())
 
@@ -314,21 +333,26 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
             break
     # Evidence tier: the visual IS the thing being discussed (person, logo,
     # landmark, product) — Wikimedia Commons before stock.
+    is_person = bool(spec.get("person"))
     if path is None and vtype == "evidence" and spec.get("visual_subject"):
         subj = spec["visual_subject"]
         url = commons_image(subj)
         if url:
-            try:
-                dest = CACHE / f"commons_{slug(subj)}.jpg"
-                download(url, dest)
-                if dest.stat().st_size > 10_000:
-                    kind, path, source = "photo", str(dest), "commons"
-                    print(f"[visuals] shot {idx}: commons '{subj}' -> photo")
-                else:
-                    dest.unlink(missing_ok=True)
-            except Exception as e:
-                print(f"[visuals] commons download failed for '{subj}': {e}")
-    if path is None:
+            dest = CACHE / f"commons_{slug(subj)}.jpg"
+            if download_retry(url, dest):
+                kind, path, source = "photo", str(dest), "commons"
+                print(f"[visuals] shot {idx}: commons '{subj}' -> photo")
+            else:
+                print(f"[visuals] commons download FAILED for '{subj}' "
+                      f"after retries")
+    if path is None and is_person:
+        # Named people: stock sites have no editorial portraits. Querying
+        # them for a person's name returns garbage (a "jay" bird for
+        # "Jay Clayton"). Go straight to the title card — a missing visual
+        # is honest, a wrong one is a hallucination.
+        print(f"[visuals] shot {idx}: NO_FIND person "
+              f"'{spec.get('visual_subject')}' — title card, not stock")
+    if path is None and not (is_person and vtype == "evidence"):
         # Bounded relevance loop: specific video -> specific photo ->
         # broadened query video/photo -> title card.
         queries = [q, " ".join(q.split()[:2])]
@@ -480,10 +504,13 @@ def main():
             s_time, e_time = ranges[j]
             dur = max(0.8, e_time - s_time)
             idx = len(visuals)
-            # First shot of a segment consumes the story's next owned asset.
+            # First shot of a story segment consumes the story's next owned
+            # asset (publisher/X media). Hook segments use their own shot
+            # spec instead — a publisher image is often about a secondary
+            # subject (e.g. White House flags for a "Musk renames" headline).
             n = story_asset_n.get(sid, 0)
             assets = story_assets.get(sid, []) if sid else []
-            if j == 0 and n < len(assets):
+            if j == 0 and n < len(assets) and seg_kind == "story":
                 story_asset_n[sid] = n + 1
                 kind, path = assets[n]
                 source = "story-owned"
