@@ -120,6 +120,45 @@ def commons_image(subject: str):
     return None
 
 
+def fetch_logo(company: str):
+    """Company logo PNG from Wikimedia Commons, for overlaying on shots
+    whose sentence names both the company and an action. SVG originals are
+    rasterized by Commons' thumbnailer (iiurlwidth), so the thumb URL is a
+    real PNG. Returns a local path or None."""
+    # Disambiguation for single-letter / generic names.
+    query = {"X": "X (social network) logo"}.get(company, f"{company} logo")
+    safe = re.sub(r"[^a-z0-9]+", "_", company.lower()).strip("_")
+    dest = ROOT / "cache" / "logos" / f"{safe}.png"
+    if dest.exists() and dest.stat().st_size > 2000:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        s = requests.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={"action": "query", "format": "json", "list": "search",
+                    "srsearch": query, "srnamespace": 6, "srlimit": 8},
+            headers=COMMONS_UA, timeout=30).json()
+        titles = [h["title"] for h in s.get("query", {}).get("search", [])]
+        if not titles:
+            return None
+        ii = requests.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={"action": "query", "format": "json",
+                    "prop": "imageinfo", "iiprop": "url|size",
+                    "iiurlwidth": 400, "titles": "|".join(titles)},
+            headers=COMMONS_UA, timeout=30).json()
+        for p in ii.get("query", {}).get("pages", {}).values():
+            for info in p.get("imageinfo", []):
+                u = info.get("thumburl") or info.get("url", "")
+                # SVG originals come back as rasterized .svg.png thumbs.
+                if u.lower().split("?")[0].endswith(".png"):
+                    download(u, dest)
+                    return dest if dest.stat().st_size > 2000 else None
+    except Exception as e:
+        print(f"[visuals] logo failed for '{company}': {e}")
+    return None
+
+
 def title_card(text: str, dest: Path, w: int, h: int):
     """Fallback visual: dark gradient card with the story title."""
     from PIL import Image, ImageDraw, ImageFont
@@ -429,9 +468,17 @@ def main():
                 print(f"[visuals] shot {idx}: story-owned {kind} -> {kind}")
             else:
                 kind, path = fetch_visual(sh, dur, w, h, script["title"], idx)
-            visuals.append({"idx": idx, "segment": i, "kind": kind,
-                            "path": path, "duration": round(dur, 3),
-                            "seg_kind": seg_kind, "start": round(s_time, 3)})
+            entry = {"idx": idx, "segment": i, "kind": kind,
+                     "path": path, "duration": round(dur, 3),
+                     "seg_kind": seg_kind, "start": round(s_time, 3)}
+            # Logo overlay: sentence names company + action -> composite.
+            logo_co = sh.get("logo_overlay")
+            if logo_co:
+                lp = fetch_logo(logo_co)
+                if lp:
+                    entry["logo"] = str(lp)
+                    print(f"[visuals] shot {idx}: +{logo_co} logo overlay")
+            visuals.append(entry)
     (ROOT / "output" / "visuals.json").write_text(json.dumps(visuals, indent=2))
     print(f"[visuals] {len(visuals)} shots planned")
 
