@@ -1,9 +1,31 @@
 {
   "posted_ids": [
-    "46a92acbee822f1c"
+    "ai-czar",
+    "gemini-flash-lite",
+    "haiku-55",
+    "moonshot-ipo",
+    "openai-722",
+    "openai-textgrain",
+    "spacexsi",
+    "synthid-detector",
+    "test1",
+    "test2",
+    "wikimedia-openai-agents",
+    "x-lift"
   ],
   "seen_ids": [
-    "46a92acbee822f1c"
+    "ai-czar",
+    "gemini-flash-lite",
+    "haiku-55",
+    "moonshot-ipo",
+    "openai-722",
+    "openai-textgrain",
+    "spacexsi",
+    "synthid-detector",
+    "test1",
+    "test2",
+    "wikimedia-openai-agents",
+    "x-lift"
   ],
   "topic_affinity": {}
 }
