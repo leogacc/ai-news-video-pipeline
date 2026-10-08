@@ -67,9 +67,20 @@ Style: Phrase,Arial,62,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
+    # Whisper mishears product names the TTS voice pronounces fine.
+    # Fix them on the caption cards (uppercase space).
+    FIXUPS = [
+        ("SPACEX'S AI", "SPACEXSI"),
+        ("SPACE X S I", "SPACEXSI"),
+        ("SPACEX AI", "SPACEXSI"),
+        ("TSAR", "CZAR"),
+        ("NAME'S", "NAMES"),
+    ]
     for ph in phrases:
         start, end = ph[0][0], ph[-1][1]
         body = " ".join(w for _, _, w in ph).upper()
+        for bad, good in FIXUPS:
+            body = body.replace(bad, good)
         body = body.replace("{", "\\{").replace("}", "\\}")
         events.append(
             f"Dialogue: 0,{ts(start)},{ts(end)},Phrase,,0,0,0,,{body}")
@@ -80,7 +91,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     (ROOT / "output" / "words.json").write_text(json.dumps(
         [{"start": round(s, 3), "end": round(e, 3), "word": w}
          for s, e, w in words], indent=1))
-    print(f"[captions] {len(words)} words -> {len(lines)} lines -> {out}")
+    print(f"[captions] {len(words)} words -> {len(phrases)} cards -> {out}")
 
 
 if __name__ == "__main__":
