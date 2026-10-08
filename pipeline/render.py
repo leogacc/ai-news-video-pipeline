@@ -145,22 +145,25 @@ def main():
         return f"{int(h_)}:{int(m_):02d}:{s_:05.2f}"
 
     def find_phrase(seg_words, phrase):
-        """(start, end) of the emphasis phrase in the whisper word stream."""
+        """(start, end) of the emphasis phrase in the whisper word stream.
+        Requires CONSECUTIVE words — a subsequence spread across the
+        segment would pin the pill up for 20+ seconds."""
         want = [_norm(w) for w in phrase.split()]
         want = [w_ for w_ in want if w_]
         if not want or not seg_words:
             return None
         have = [_norm(w_["word"]) for w_ in seg_words]
-        for s_ in range(len(have)):
-            if have[s_] != want[0]:
-                continue
-            h_, wi = s_, 0
-            while h_ < len(have) and wi < len(want):
-                if have[h_] == want[wi]:
-                    wi += 1
-                h_ += 1
-            if wi == len(want):
-                return seg_words[s_]["start"], seg_words[h_ - 1]["end"]
+        for s_ in range(len(have) - len(want) + 1):
+            if have[s_:s_ + len(want)] == want:
+                return seg_words[s_]["start"], seg_words[s_ + len(want) - 1]["end"]
+        return None
+
+    def find_word(seg_words, word):
+        """First occurrence of a single word."""
+        w = _norm(word)
+        for sw in seg_words:
+            if _norm(sw["word"]) == w:
+                return sw["start"], sw["end"]
         return None
 
     emph_header = """[Script Info]
@@ -187,10 +190,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                      if w_["start"] >= seg_start - 0.05 and w_["start"] < seg_end]
         m = find_phrase(seg_words, emph)
         if m:
+            # Full phrase found back-to-back: pill hugs the spoken words.
             w0, w1 = m
-            estart, eend = max(seg_start, w0 - 0.35), min(seg_end, w1 + 0.8)
+            estart, eend = max(seg_start, w0 - 0.35), min(seg_end, w1 + 1.2)
         else:
-            estart, eend = seg_start + 0.3, seg_end
+            # Phrase not back-to-back in the transcript: anchor a short
+            # pill on its first word instead of spanning the segment.
+            first = emph.split()[0]
+            wm = find_word(seg_words, first)
+            if wm:
+                estart = max(seg_start, wm[0] - 0.35)
+            else:
+                estart = seg_start + 0.3
+            eend = estart + 3.0
+        eend = min(eend, seg_end, estart + 6.0)  # pills stay punchy
         # Face-aware position: person shots center the face, so the pill
         # goes to the upper area; otherwise mid-frame.
         face_shot = any(
