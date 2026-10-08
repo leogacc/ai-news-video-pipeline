@@ -218,11 +218,108 @@ def website_media(article_url: str):
     return None, None
 
 
+def norm_w(w: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", w.lower())
+
+
+def match_shot(shot_text: str, seg_words, seg_start: float, seg_end: float):
+    """(start, end) timestamps for a shot by matching its words against the
+    whisper word stream. Falls back to None."""
+    want = [norm_w(w) for w in shot_text.split()]
+    want = [w for w in want if w]
+    if not want or not seg_words:
+        return None
+    have = [norm_w(w["word"]) for w in seg_words]
+    # Find the want sequence as an ordered subsequence of have.
+    best = None
+    for s in range(len(have)):
+        if have[s] != want[0]:
+            continue
+        h, wi = s, 0
+        while h < len(have) and wi < len(want):
+            if have[h] == want[wi]:
+                wi += 1
+            h += 1
+        if wi == len(want):
+            best = (seg_words[s]["start"], seg_words[h - 1]["end"])
+            break
+    if best:
+        return best
+    return None
+
+
+def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
+                 idx: int):
+    """Resolve one visual per the evidence/illustrative tier. Returns
+    (kind, path)."""
+    vtype = spec.get("visual_type", "illustrative")
+    q = spec.get("broll") or "technology abstract"
+    clip_dest = CACHE / f"{slug(q)}.mp4"
+    photo_dest = CACHE / f"{slug(q)}.jpg"
+    kind, path = None, None
+    for cand in (clip_dest, photo_dest):
+        if cand.exists() and cand.stat().st_size >= 10_000:
+            kind = "clip" if cand.suffix == ".mp4" else "photo"
+            path = str(cand)
+            break
+    # Evidence tier: the visual IS the thing being discussed (person, logo,
+    # landmark, product) — Wikimedia Commons before stock.
+    if path is None and vtype == "evidence" and spec.get("visual_subject"):
+        subj = spec["visual_subject"]
+        url = commons_image(subj)
+        if url:
+            try:
+                dest = CACHE / f"commons_{slug(subj)}.jpg"
+                download(url, dest)
+                if dest.stat().st_size > 10_000:
+                    kind, path = "photo", str(dest)
+                    print(f"[visuals] shot {idx}: commons '{subj}' -> photo")
+                else:
+                    dest.unlink(missing_ok=True)
+            except Exception as e:
+                print(f"[visuals] commons download failed for '{subj}': {e}")
+    if path is None:
+        # Bounded relevance loop: specific video -> specific photo ->
+        # broadened query video/photo -> title card.
+        queries = [q, " ".join(q.split()[:2])]
+        for qq in queries:
+            for mkind, mdest in (("videos", clip_dest),
+                                 ("photos", photo_dest)):
+                if path:
+                    break
+                try:
+                    url = pixabay_media(qq, mkind)
+                except Exception as e:
+                    print(f"[visuals] pixabay {mkind} failed for '{qq}': {e}")
+                    url = None
+                if not url and mkind == "videos":
+                    try:
+                        url = pexels_search(qq)
+                    except Exception as e:
+                        print(f"[visuals] pexels failed for '{qq}': {e}")
+                if url:
+                    try:
+                        download(url, mdest)
+                        kind = "clip" if mkind == "videos" else "photo"
+                        path = str(mdest)
+                        print(f"[visuals] shot {idx}: '{qq}' -> {kind}")
+                    except Exception as e:
+                        print(f"[visuals] download failed for '{qq}': {e}")
+                        mdest.unlink(missing_ok=True)
+    if path is None:
+        path = str(ROOT / "output" / f"card_{idx:02d}.png")
+        title_card(script_title, Path(path), w, h)
+        kind = "card"
+        print(f"[visuals] shot {idx}: '{q}' -> title card fallback")
+    return kind, path
+
+
 def main():
     import sys
     mode = sys.argv[sys.argv.index("--mode") + 1] if "--mode" in sys.argv else "daily"
     script = json.loads((ROOT / "output" / "script.json").read_text())
     timings = json.loads((ROOT / "output" / "timings.json").read_text())
+    words = json.loads((ROOT / "output" / "words.json").read_text())
     w, h = CFG[mode]["width"], CFG[mode]["height"]
 
     visuals = []
@@ -230,7 +327,7 @@ def main():
     # Pre-pass per story, in relevance order:
     #   1. the story's own X post video (x_media_url, or x.com story URL)
     #   2. the publisher's own page media (og:video / og:image)
-    # Later segments fall through to the Pixabay loop below.
+    # Later shots fall through to the evidence/illustrative loop below.
     story_assets = {}  # sid -> [(kind, local_path), ...]
     for sid, src in zip(script.get("story_ids", []),
                         script.get("sources", [])):
@@ -285,91 +382,58 @@ def main():
         if assets:
             story_assets[sid] = assets
 
-    story_seg_n = {}
+    # Words per segment, from absolute whisper timestamps + tts timings.
+    seg_word_ranges = []
+    for i, tm in enumerate(timings):
+        s, e = tm["start"], tm["start"] + tm["duration"] + CFG["tts"]["segment_gap_sec"]
+        seg_word_ranges.append(
+            [ww for ww in words if ww["start"] >= s - 0.05 and ww["start"] < e])
+
+    story_asset_n = {}
     for i, seg in enumerate(script["segments"]):
         sid = seg.get("story_id")
-        dur = timings[i]["duration"] + CFG["tts"]["segment_gap_sec"]
         seg_kind = seg.get("kind", "story")  # hook | headlines | story
-        vtype = seg.get("visual_type", "illustrative")  # evidence | illustrative
-        # Story-owned media first, in priority order across its segments.
-        assets = story_assets.get(sid, []) if sid else []
-        n = story_seg_n.get(sid, 0)
-        if n < len(assets):
-            story_seg_n[sid] = n + 1
-            kind, path = assets[n]
-            visuals.append({"segment": i, "kind": kind, "path": path,
-                            "duration": dur, "seg_kind": seg_kind})
-            print(f"[visuals] seg {i}: story-owned {kind} -> {kind}")
-            continue
-        story_seg_n[sid] = n + 1
-        q = seg.get("broll") or "technology abstract"
-        clip_dest = CACHE / f"{slug(q)}.mp4"
-        photo_dest = CACHE / f"{slug(q)}.jpg"
-        kind, path = None, None
-        for cand in (clip_dest, photo_dest):
-            if cand.exists() and cand.stat().st_size >= 10_000:
-                kind = "clip" if cand.suffix == ".mp4" else "photo"
-                path = str(cand)
+        tm = timings[i]
+        seg_start = tm["start"]
+        seg_words = seg_word_ranges[i] if i < len(seg_word_ranges) else []
+        shots = seg.get("shots") or [dict(seg, text=seg["text"])]
+        # Shot time ranges via word matching; fallback = even split.
+        ranges = []
+        ok = True
+        for sh in shots:
+            m = match_shot(sh.get("text", ""), seg_words, seg_start,
+                           tm["start"] + tm["duration"])
+            if m is None:
+                ok = False
                 break
-        # Evidence tier: the visual IS the thing being discussed (person,
-        # logo, landmark, product) — Wikimedia Commons before stock.
-        if path is None and vtype == "evidence" and seg.get("visual_subject"):
-            subj = seg["visual_subject"]
-            try:
-                url = commons_image(subj)
-            except Exception as e:
-                print(f"[visuals] commons failed for '{subj}': {e}")
-                url = None
-            if url:
-                try:
-                    dest = CACHE / f"commons_{slug(subj)}.jpg"
-                    download(url, dest)
-                    if dest.stat().st_size > 10_000:
-                        kind, path = "photo", str(dest)
-                        print(f"[visuals] seg {i}: commons '{subj}' -> photo")
-                    else:
-                        dest.unlink(missing_ok=True)
-                except Exception as e:
-                    print(f"[visuals] commons download failed for "
-                          f"'{subj}': {e}")
-        if path is None:
-            # Bounded relevance loop: specific video -> specific photo ->
-            # broadened query video/photo -> title card.
-            queries = [q, " ".join(q.split()[:2])]
-            for qq in queries:
-                for mkind, mdest in (("videos", clip_dest),
-                                     ("photos", photo_dest)):
-                    if path:
-                        break
-                    try:
-                        url = pixabay_media(qq, mkind)
-                    except Exception as e:
-                        print(f"[visuals] pixabay {mkind} failed for "
-                              f"'{qq}': {e}")
-                        url = None
-                    if not url and mkind == "videos":
-                        try:
-                            url = pexels_search(qq)
-                        except Exception as e:
-                            print(f"[visuals] pexels failed for '{qq}': {e}")
-                    if url:
-                        try:
-                            download(url, mdest)
-                            kind = "clip" if mkind == "videos" else "photo"
-                            path = str(mdest)
-                            print(f"[visuals] seg {i}: '{qq}' -> {kind}")
-                        except Exception as e:
-                            print(f"[visuals] download failed for '{qq}': {e}")
-                            mdest.unlink(missing_ok=True)
-        if path is None:
-            path = str(ROOT / "output" / f"card_{i:02d}.png")
-            title_card(script["title"], Path(path), w, h)
-            kind = "card"
-            print(f"[visuals] seg {i}: '{q}' -> title card fallback")
-        visuals.append({"segment": i, "kind": kind, "path": path,
-                        "duration": dur, "seg_kind": seg_kind})
+            ranges.append(m)
+        if not ok or not ranges:
+            n = len(shots)
+            total = tm["duration"] + CFG["tts"]["segment_gap_sec"]
+            ranges = [(seg_start + total * k / n, seg_start + total * (k + 1) / n)
+                      for k in range(n)]
+        # Last shot fills to the segment end (+ inter-segment gap) so shots
+        # sum to the narration length.
+        seg_total = tm["duration"] + CFG["tts"]["segment_gap_sec"]
+        ranges[-1] = (ranges[-1][0], seg_start + seg_total)
+        for j, sh in enumerate(shots):
+            s_time, e_time = ranges[j]
+            dur = max(0.8, e_time - s_time)
+            idx = len(visuals)
+            # First shot of a segment consumes the story's next owned asset.
+            n = story_asset_n.get(sid, 0)
+            assets = story_assets.get(sid, []) if sid else []
+            if j == 0 and n < len(assets):
+                story_asset_n[sid] = n + 1
+                kind, path = assets[n]
+                print(f"[visuals] shot {idx}: story-owned {kind} -> {kind}")
+            else:
+                kind, path = fetch_visual(sh, dur, w, h, script["title"], idx)
+            visuals.append({"idx": idx, "segment": i, "kind": kind,
+                            "path": path, "duration": round(dur, 3),
+                            "seg_kind": seg_kind, "start": round(s_time, 3)})
     (ROOT / "output" / "visuals.json").write_text(json.dumps(visuals, indent=2))
-    print(f"[visuals] {len(visuals)} segments planned")
+    print(f"[visuals] {len(visuals)} shots planned")
 
 
 if __name__ == "__main__":
