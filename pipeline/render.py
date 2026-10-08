@@ -130,26 +130,83 @@ def main():
         vf_parts.append(f"tpad=stop_mode=clone:stop_duration={pad:.3f}")
         print(f"[render] padding video {pad:.2f}s to narration length")
     script = json.loads((ROOT / "output" / "script.json").read_text())
-    seg_bounds, cur_seg, cur_start, t_acc = {}, None, 0.0, 0.0
-    for v in visuals:
-        if v["segment"] != cur_seg:
-            if cur_seg is not None:
-                seg_bounds[cur_seg] = (cur_start, t_acc)
-            cur_seg, cur_start = v["segment"], t_acc
-        t_acc += v["duration"]
-    if cur_seg is not None:
-        seg_bounds[cur_seg] = (cur_start, t_acc)
+    # Emphasis pills as ASS events (not drawtext): they fade in right before
+    # the emphasized words are spoken, and sit away from faces.
+    words = json.loads((ROOT / "output" / "words.json").read_text())
+    timings = json.loads((ROOT / "output" / "timings.json").read_text())
+
+    def _norm(w):
+        return re.sub(r"[^a-z0-9]", "", w.lower())
+
+    def _ts(sec):
+        sec = max(0.0, sec)
+        h_, rem = divmod(sec, 3600)
+        m_, s_ = divmod(rem, 60)
+        return f"{int(h_)}:{int(m_):02d}:{s_:05.2f}"
+
+    def find_phrase(seg_words, phrase):
+        """(start, end) of the emphasis phrase in the whisper word stream."""
+        want = [_norm(w) for w in phrase.split()]
+        want = [w_ for w_ in want if w_]
+        if not want or not seg_words:
+            return None
+        have = [_norm(w_["word"]) for w_ in seg_words]
+        for s_ in range(len(have)):
+            if have[s_] != want[0]:
+                continue
+            h_, wi = s_, 0
+            while h_ < len(have) and wi < len(want):
+                if have[h_] == want[wi]:
+                    wi += 1
+                h_ += 1
+            if wi == len(want):
+                return seg_words[s_]["start"], seg_words[h_ - 1]["end"]
+        return None
+
+    emph_header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Emphasis,Arial,76,&H00FFFFFF,&H00000000,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,3,8,0,5,60,60,60,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    emph_events = []
     for si, seg in enumerate(script["segments"]):
         emph = (seg.get("emphasis") or "").strip()
-        if not emph or si not in seg_bounds:
+        if not emph or si >= len(timings):
             continue
-        safe = re.sub(r"[^A-Za-z0-9 $%.,!?-]", "", emph).replace(":", "\\:")
-        s0, s1 = seg_bounds[si]
-        vf_parts.append(
-            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/"
-            f"DejaVuSans-Bold.ttf:text='{safe}':fontsize=76:"
-            f"fontcolor=white:box=1:boxcolor=black@0xAA:boxborderw=28:"
-            f"x=(w-text_w)/2:y=h*0.42:enable='between(t,{s0:.2f},{s1:.2f})'")
+        tm = timings[si]
+        seg_start, seg_end = tm["start"], tm["start"] + tm["duration"]
+        seg_words = [w_ for w_ in words
+                     if w_["start"] >= seg_start - 0.05 and w_["start"] < seg_end]
+        m = find_phrase(seg_words, emph)
+        if m:
+            w0, w1 = m
+            estart, eend = max(seg_start, w0 - 0.35), min(seg_end, w1 + 0.8)
+        else:
+            estart, eend = seg_start + 0.3, seg_end
+        # Face-aware position: person shots center the face, so the pill
+        # goes to the upper area; otherwise mid-frame.
+        face_shot = any(
+            v.get("person") and not (v["start"] + v["duration"] <= estart
+                                    or v["start"] >= eend)
+            for v in visuals if v["segment"] == si)
+        y = int(h * 0.22) if face_shot else int(h * 0.42)
+        safe = emph.replace("{", "\\{").replace("}", "\\}")
+        emph_events.append(
+            f"Dialogue: 0,{_ts(estart)},{_ts(eend)},Emphasis,,0,0,0,,"
+            f"{{\\fad(300,250)\\pos(540,{y})}}{safe}")
+    if emph_events:
+        epath = ROOT / "output" / "emphasis.ass"
+        epath.write_text(emph_header + "\n".join(emph_events) + "\n")
+        vf_parts.append(f"ass={epath}")
+        print(f"[render] {len(emph_events)} emphasis pills (timed + face-aware)")
     run(["ffmpeg", "-y", *inputs,
          "-filter_complex", afilter,
          "-vf", ",".join(vf_parts),
