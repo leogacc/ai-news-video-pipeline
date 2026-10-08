@@ -144,16 +144,25 @@ def fetch_logo(company: str):
         ii = requests.get(
             "https://commons.wikimedia.org/w/api.php",
             params={"action": "query", "format": "json",
-                    "prop": "imageinfo", "iiprop": "url|size",
+                    "prop": "imageinfo", "iiprop": "url|size|timestamp",
                     "iiurlwidth": 400, "titles": "|".join(titles)},
             headers=COMMONS_UA, timeout=30).json()
+        # Newest upload first: brand marks go stale (e.g. 2017 wordmarks
+        # lingering next to current logos). Freshness beats relevance rank.
+        cands = []
         for p in ii.get("query", {}).get("pages", {}).values():
             for info in p.get("imageinfo", []):
                 u = info.get("thumburl") or info.get("url", "")
                 # SVG originals come back as rasterized .svg.png thumbs.
                 if u.lower().split("?")[0].endswith(".png"):
-                    download(u, dest)
-                    return dest if dest.stat().st_size > 2000 else None
+                    cands.append((info.get("timestamp", ""), u))
+        cands.sort(reverse=True)
+        for _, u in cands:
+            download(u, dest)
+            if dest.stat().st_size > 2000:
+                return dest
+            dest.unlink(missing_ok=True)
+        return None
     except Exception as e:
         print(f"[visuals] logo failed for '{company}': {e}")
     return None
@@ -290,16 +299,18 @@ def match_shot(shot_text: str, seg_words, seg_start: float, seg_end: float):
 def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                  idx: int):
     """Resolve one visual per the evidence/illustrative tier. Returns
-    (kind, path)."""
+    (kind, path, source). Source is explicit — a wrong or generic visual
+    is a hallucination vector, so fallbacks are labeled, never silent."""
     vtype = spec.get("visual_type", "illustrative")
     q = spec.get("broll") or "technology abstract"
     clip_dest = CACHE / f"{slug(q)}.mp4"
     photo_dest = CACHE / f"{slug(q)}.jpg"
-    kind, path = None, None
+    kind, path, source = None, None, None
     for cand in (clip_dest, photo_dest):
         if cand.exists() and cand.stat().st_size >= 10_000:
             kind = "clip" if cand.suffix == ".mp4" else "photo"
             path = str(cand)
+            source = "cache"
             break
     # Evidence tier: the visual IS the thing being discussed (person, logo,
     # landmark, product) — Wikimedia Commons before stock.
@@ -311,7 +322,7 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                 dest = CACHE / f"commons_{slug(subj)}.jpg"
                 download(url, dest)
                 if dest.stat().st_size > 10_000:
-                    kind, path = "photo", str(dest)
+                    kind, path, source = "photo", str(dest), "commons"
                     print(f"[visuals] shot {idx}: commons '{subj}' -> photo")
                 else:
                     dest.unlink(missing_ok=True)
@@ -331,26 +342,36 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                 except Exception as e:
                     print(f"[visuals] pixabay {mkind} failed for '{qq}': {e}")
                     url = None
+                provider = None
                 if not url and mkind == "videos":
                     try:
                         url = pexels_search(qq)
+                        provider = "pexels" if url else None
                     except Exception as e:
                         print(f"[visuals] pexels failed for '{qq}': {e}")
+                if not provider and url:
+                    provider = "pixabay"
                 if url:
                     try:
                         download(url, mdest)
                         kind = "clip" if mkind == "videos" else "photo"
                         path = str(mdest)
-                        print(f"[visuals] shot {idx}: '{qq}' -> {kind}")
+                        source = provider or mkind
+                        print(f"[visuals] shot {idx}: '{qq}' -> {kind} [{source}]")
                     except Exception as e:
                         print(f"[visuals] download failed for '{qq}': {e}")
                         mdest.unlink(missing_ok=True)
     if path is None:
         path = str(ROOT / "output" / f"card_{idx:02d}.png")
         title_card(script_title, Path(path), w, h)
-        kind = "card"
+        kind, source = "card", "title-card"
         print(f"[visuals] shot {idx}: '{q}' -> title card fallback")
-    return kind, path
+    # An evidence shot that fell back to generic stock is a wrong visual
+    # until proven otherwise — flag it loudly instead of passing silently.
+    if vtype == "evidence" and source in ("pixabay", "photos", "videos", "pexels"):
+        print(f"[visuals] shot {idx}: FALLBACK generic {kind} for evidence "
+              f"'{spec.get('visual_subject')}' — verify before publish")
+    return kind, path, source
 
 
 def main():
@@ -465,12 +486,14 @@ def main():
             if j == 0 and n < len(assets):
                 story_asset_n[sid] = n + 1
                 kind, path = assets[n]
+                source = "story-owned"
                 print(f"[visuals] shot {idx}: story-owned {kind} -> {kind}")
             else:
-                kind, path = fetch_visual(sh, dur, w, h, script["title"], idx)
+                kind, path, source = fetch_visual(sh, dur, w, h, script["title"], idx)
             entry = {"idx": idx, "segment": i, "kind": kind,
                      "path": path, "duration": round(dur, 3),
-                     "seg_kind": seg_kind, "start": round(s_time, 3)}
+                     "seg_kind": seg_kind, "start": round(s_time, 3),
+                     "source": source}
             # Logo overlay: sentence names company + action -> composite.
             logo_co = sh.get("logo_overlay")
             if logo_co:
