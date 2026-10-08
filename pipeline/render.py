@@ -114,6 +114,21 @@ def main():
     # Emphasis pills: 2-4 word punch labels, white bold text on a black box,
     # centered mid-frame (never fights the bottom-third caption cards).
     vf_parts = [f"ass={captions}"]
+    # Never cut the speaker: frame rounding can leave the shot plan a hair
+    # shorter than the narration. Pad the video out to the narration length
+    # instead of letting -shortest truncate the audio.
+    vdur = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(vcat)],
+        capture_output=True, text=True).stdout.strip() or 0)
+    ndur = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(narration)],
+        capture_output=True, text=True).stdout.strip() or 0)
+    pad = max(0.0, ndur - vdur)
+    if pad > 0.02:
+        vf_parts.append(f"tpad=stop_mode=clone:stop_duration={pad:.3f}")
+        print(f"[render] padding video {pad:.2f}s to narration length")
     script = json.loads((ROOT / "output" / "script.json").read_text())
     seg_bounds, cur_seg, cur_start, t_acc = {}, None, 0.0, 0.0
     for v in visuals:
