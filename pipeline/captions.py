@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""PRODUCER (captions) — faster-whisper word timestamps -> karaoke .ass.
+"""PRODUCER (captions) — faster-whisper word timestamps -> phrase-card .ass.
 
-CapCut-style: active word highlighted, rest white, middle-third placement
-(Alignment 5) so platform UI never covers the text. 80%+ of social video is
-watched muted — captions are the retention mechanism, not decoration.
+Reference style (@theventure): NOT karaoke. Text swaps phrase-by-phrase
+every ~2-3s — faster than the visual cuts. ALL-CAPS bold, black text on a
+white opaque box, bottom third (Alignment 2). Punch-phrase pills are drawn
+separately by render.py (white on black, mid-frame).
+80%+ of social video is watched muted — captions are the retention
+mechanism, not decoration.
 """
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -36,19 +40,19 @@ def main():
     if not words:
         raise RuntimeError("[captions] whisper returned no words")
 
-    # Group into short lines for 9:16.
-    lines, cur = [], []
+    # Group into phrase cards: break at sentence end, or when a card would
+    # exceed ~2.8s / 12 words. Cards swap faster than the visual cuts.
+    phrases, cur = [], []
     for s, e, w in words:
         cur.append((s, e, w))
-        if len(cur) >= C["max_words_per_line"] or (cur and e - cur[0][0] > 3.5):
-            lines.append(cur)
+        ends = bool(re.search(r"[.?!:;]$", w))
+        if ends or len(cur) >= 12 or (cur and e - cur[0][0] > 2.8):
+            phrases.append(cur)
             cur = []
     if cur:
-        lines.append(cur)
+        phrases.append(cur)
 
-    # NOTE on karaoke colors: in ASS, {\kf} sweeps the fill from SecondaryColour
-    # (unsung) to PrimaryColour (sung). If your render shows the highlight
-    # inverted (unsung words yellow), swap PrimaryColour and SecondaryColour below.
+    # ALL-CAPS, black text on white opaque box (BorderStyle=3), bottom third.
     header = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -57,19 +61,18 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Karaoke,Arial,76,&H0000CCFF,&H00FFFFFF,&H90000000,&H90000000,-1,0,0,0,100,100,0,0,1,5,1,5,60,60,60,1
+Style: Phrase,Arial,62,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,10,0,2,60,60,110,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
-    for line in lines:
-        start, end = line[0][0], line[-1][1]
-        body = "".join(
-            "{\\kf%d}%s " % (max(1, int(round((e - s) * 100))), w)
-            for s, e, w in line).strip()
+    for ph in phrases:
+        start, end = ph[0][0], ph[-1][1]
+        body = " ".join(w for _, _, w in ph).upper()
+        body = body.replace("{", "\\{").replace("}", "\\}")
         events.append(
-            f"Dialogue: 0,{ts(start)},{ts(end)},Karaoke,,0,0,0,,{body}")
+            f"Dialogue: 0,{ts(start)},{ts(end)},Phrase,,0,0,0,,{body}")
 
     out = ROOT / "output" / "captions.ass"
     out.write_text(header + "\n".join(events) + "\n")
