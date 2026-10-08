@@ -6,3 +6,6 @@ output/*.wav
 cache/clips/
 token.pickle
 client_secrets.json
+.env
+.venv/
+.kokoro_cache/
