@@ -567,7 +567,8 @@ def main():
             entry = {"idx": idx, "segment": i, "kind": kind,
                      "path": path, "duration": round(dur, 3),
                      "seg_kind": seg_kind, "start": round(s_time, 3),
-                     "source": source}
+                     "source": source,
+                     "person": bool(sh.get("person"))}
             # Logo overlay: sentence names company + action -> composite.
             logo_co = sh.get("logo_overlay")
             if logo_co:
