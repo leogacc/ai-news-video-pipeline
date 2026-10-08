@@ -38,10 +38,9 @@ def main():
     seg_dir.mkdir(exist_ok=True)
 
     seg_files = []
-    # Ken Burns speed by segment kind: the hook punches in fast, headlines
-    # drift at medium speed, story breakdowns get a slow settle. Clips
-    # already move, so they never get artificial motion.
-    ZOOM_RATE = {"hook": 0.0028, "headlines": 0.0016, "story": 0.0009}
+    # Ken Burns speed by segment kind: quick, subtle zooms that read inside
+    # 4-6s shots. The pace comes from hard cuts, the zoom just adds life.
+    ZOOM_RATE = {"hook": 0.0028, "headlines": 0.0022, "story": 0.0018}
     for v in visuals:
         i, dur = v["idx"], v["duration"]
         out = seg_dir / f"shot_{i:02d}.mp4"
@@ -99,8 +98,8 @@ def main():
         amap = "[aout]"
 
     final = ROOT / "output" / f"ainews_{mode}.mp4"
-    # Emphasis overlays: big keyword text per segment (upper third, so it
-    # never fights the mid-frame karaoke captions).
+    # Emphasis pills: 2-4 word punch labels, white bold text on a black box,
+    # centered mid-frame (never fights the bottom-third caption cards).
     vf_parts = [f"ass={captions}"]
     script = json.loads((ROOT / "output" / "script.json").read_text())
     seg_bounds, cur_seg, cur_start, t_acc = {}, None, 0.0, 0.0
@@ -120,9 +119,9 @@ def main():
         s0, s1 = seg_bounds[si]
         vf_parts.append(
             "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/"
-            f"DejaVuSans-Bold.ttf:text='{safe}':fontsize=96:"
-            f"fontcolor=white:borderw=4:bordercolor=black@0xAA:"
-            f"x=(w-text_w)/2:y=h*0.24:enable='between(t,{s0:.2f},{s1:.2f})'")
+            f"DejaVuSans-Bold.ttf:text='{safe}':fontsize=76:"
+            f"fontcolor=white:box=1:boxcolor=black@0xAA:boxborderw=28:"
+            f"x=(w-text_w)/2:y=h*0.42:enable='between(t,{s0:.2f},{s1:.2f})'")
     run(["ffmpeg", "-y", *inputs,
          "-filter_complex", afilter,
          "-vf", ",".join(vf_parts),
