@@ -2,8 +2,11 @@ name: daily-short
 # Daily 9:16 short. 06:00 PT = 13:00 UTC (14:00 during PDT — close enough;
 # adjust the cron if you want it exact).
 on:
-  schedule:
-    - cron: "0 13 * * *"
+  # schedule DISABLED 2026-10-07 — the VM branch (cron: muse-video-pipeline-daily)
+  # is now the primary daily runner. Kept as fallback infra via manual dispatch.
+  # To re-enable: uncomment the schedule block below.
+  #schedule:
+  #  - cron: "0 13 * * *"
   workflow_dispatch:
 
 permissions:
