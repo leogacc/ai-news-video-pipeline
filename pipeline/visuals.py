@@ -549,12 +549,14 @@ def main():
             dur = max(0.8, e_time - s_time)
             idx = len(visuals)
             # First shot of a story segment consumes the story's next owned
-            # asset (publisher/X media). Hook segments use their own shot
-            # spec instead — a publisher image is often about a secondary
-            # subject (e.g. White House flags for a "Musk renames" headline).
+            # asset (publisher/X media) — unless the shot names a person.
+            # A person shot must show the person; the publisher image is
+            # often about a secondary subject. Hook segments use their own
+            # shot spec for the same reason.
             n = story_asset_n.get(sid, 0)
             assets = story_assets.get(sid, []) if sid else []
-            if j == 0 and n < len(assets) and seg_kind == "story":
+            if (j == 0 and n < len(assets) and seg_kind == "story"
+                    and not sh.get("person")):
                 story_asset_n[sid] = n + 1
                 kind, path = assets[n]
                 source = "story-owned"
