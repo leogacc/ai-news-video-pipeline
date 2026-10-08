@@ -73,6 +73,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     out = ROOT / "output" / "captions.ass"
     out.write_text(header + "\n".join(events) + "\n")
+    # Word timestamps for per-sentence shot timing in visuals.py.
+    (ROOT / "output" / "words.json").write_text(json.dumps(
+        [{"start": round(s, 3), "end": round(e, 3), "word": w}
+         for s, e, w in words], indent=1))
     print(f"[captions] {len(words)} words -> {len(lines)} lines -> {out}")
 
 
