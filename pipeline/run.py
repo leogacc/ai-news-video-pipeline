@@ -43,12 +43,22 @@ def reading_level_only() -> bool:
 
 def main():
     mode = sys.argv[sys.argv.index("--mode") + 1] if "--mode" in sys.argv else "daily"
+    skip = sys.argv[sys.argv.index("--skip") + 1].split(",") if "--skip" in sys.argv else []
+    # On the VM branch the scheduled worker curates and writes the script
+    # itself (it IS the scout/writer/fact-checker), so ingest+write are
+    # skipped and the SIMPLIFY rewrite loop is disabled — the worker
+    # rewrites in plain language directly if QA flags reading level.
+    vm_write = "write" in skip
     env = dict(os.environ)
     simplify_tries = 0
     i = 0
     try:
         while i < len(STAGES):
             stage = STAGES[i]
+            if stage in skip:
+                print(f"\n===== STAGE: {stage} ({mode}) — skipped (provided by worker) =====")
+                i += 1
+                continue
             print(f"\n===== STAGE: {stage} ({mode}) =====")
             try:
                 subprocess.run([sys.executable, str(ROOT / f"{stage}.py"),
@@ -59,7 +69,7 @@ def main():
                 # simpler language and redo write..qa (max 2 tries). The
                 # video was already fully built once; this just dumbs down
                 # the wording until the high-school gate passes.
-                if stage == "qa" and simplify_tries < 2 and reading_level_only():
+                if stage == "qa" and simplify_tries < 2 and reading_level_only() and not vm_write:
                     simplify_tries += 1
                     print(f"[run] QA blocked only on reading level — "
                           f"simplifying script (try {simplify_tries}/2)")
