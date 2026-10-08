@@ -2,8 +2,10 @@ name: weekly-longform
 # Sunday 08:00 PT = 15:00 UTC. Staggered 2h after the daily short so the two
 # never race on state.json (dedupe log). Renders the 16:9 weekly roundup (~30-60 min).
 on:
-  schedule:
-    - cron: "0 15 * * 0"
+  # schedule DISABLED 2026-10-07 — VM branch is primary; kept as fallback infra
+  # via manual dispatch. To re-enable: uncomment the schedule block below.
+  #schedule:
+  #  - cron: "0 15 * * 0"
   workflow_dispatch:
 
 permissions:
