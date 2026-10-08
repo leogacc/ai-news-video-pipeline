@@ -77,11 +77,47 @@ def pixabay_media(query: str, kind: str = "videos"):
 
 
 def download(url: str, dest: Path):
-    with requests.get(url, stream=True, timeout=120) as r:
+    # A real User-Agent: thumb.wikimedia.org 403s generic clients.
+    with requests.get(url, stream=True, timeout=120,
+                      headers=COMMONS_UA) as r:
         r.raise_for_status()
         with open(dest, "wb") as f:
             for chunk in r.iter_content(1 << 20):
                 f.write(chunk)
+
+
+COMMONS_UA = {"User-Agent":
+              "ai-news-video-pipeline/1.0 (educational news digest)"}
+
+
+def commons_image(subject: str):
+    """Evidence shot from Wikimedia Commons (freely licensed): the specific
+    thing named by `subject` (person, logo, landmark, product). Returns a
+    direct jpg/png URL or None."""
+    try:
+        s = requests.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={"action": "query", "format": "json", "list": "search",
+                    "srsearch": f"{subject} filetype:jpg",
+                    "srnamespace": 6, "srlimit": 8},
+            headers=COMMONS_UA, timeout=30).json()
+        titles = [h["title"] for h in s.get("query", {}).get("search", [])]
+        if not titles:
+            return None
+        ii = requests.get(
+            "https://commons.wikimedia.org/w/api.php",
+            params={"action": "query", "format": "json",
+                    "prop": "imageinfo", "iiprop": "url|size",
+                    "iiurlwidth": 1280, "titles": "|".join(titles)},
+            headers=COMMONS_UA, timeout=30).json()
+        for p in ii.get("query", {}).get("pages", {}).values():
+            for info in p.get("imageinfo", []):
+                u = info.get("thumburl") or info.get("url", "")
+                if u.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png")):
+                    return u
+    except Exception as e:
+        print(f"[visuals] commons failed for '{subject}': {e}")
+    return None
 
 
 def title_card(text: str, dest: Path, w: int, h: int):
@@ -253,6 +289,8 @@ def main():
     for i, seg in enumerate(script["segments"]):
         sid = seg.get("story_id")
         dur = timings[i]["duration"] + CFG["tts"]["segment_gap_sec"]
+        seg_kind = seg.get("kind", "story")  # hook | headlines | story
+        vtype = seg.get("visual_type", "illustrative")  # evidence | illustrative
         # Story-owned media first, in priority order across its segments.
         assets = story_assets.get(sid, []) if sid else []
         n = story_seg_n.get(sid, 0)
@@ -260,7 +298,7 @@ def main():
             story_seg_n[sid] = n + 1
             kind, path = assets[n]
             visuals.append({"segment": i, "kind": kind, "path": path,
-                            "duration": dur})
+                            "duration": dur, "seg_kind": seg_kind})
             print(f"[visuals] seg {i}: story-owned {kind} -> {kind}")
             continue
         story_seg_n[sid] = n + 1
@@ -273,6 +311,27 @@ def main():
                 kind = "clip" if cand.suffix == ".mp4" else "photo"
                 path = str(cand)
                 break
+        # Evidence tier: the visual IS the thing being discussed (person,
+        # logo, landmark, product) — Wikimedia Commons before stock.
+        if path is None and vtype == "evidence" and seg.get("visual_subject"):
+            subj = seg["visual_subject"]
+            try:
+                url = commons_image(subj)
+            except Exception as e:
+                print(f"[visuals] commons failed for '{subj}': {e}")
+                url = None
+            if url:
+                try:
+                    dest = CACHE / f"commons_{slug(subj)}.jpg"
+                    download(url, dest)
+                    if dest.stat().st_size > 10_000:
+                        kind, path = "photo", str(dest)
+                        print(f"[visuals] seg {i}: commons '{subj}' -> photo")
+                    else:
+                        dest.unlink(missing_ok=True)
+                except Exception as e:
+                    print(f"[visuals] commons download failed for "
+                          f"'{subj}': {e}")
         if path is None:
             # Bounded relevance loop: specific video -> specific photo ->
             # broadened query video/photo -> title card.
@@ -308,7 +367,7 @@ def main():
             kind = "card"
             print(f"[visuals] seg {i}: '{q}' -> title card fallback")
         visuals.append({"segment": i, "kind": kind, "path": path,
-                        "duration": dur})
+                        "duration": dur, "seg_kind": seg_kind})
     (ROOT / "output" / "visuals.json").write_text(json.dumps(visuals, indent=2))
     print(f"[visuals] {len(visuals)} segments planned")
 
