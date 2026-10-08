@@ -20,7 +20,7 @@ T = CFG["tts"]
 
 def tighten_pauses(data: np.ndarray, sr: int,
                    thresh_db: float = -35.0,
-                   max_pause_sec: float = 0.35,
+                   max_pause_sec: float = 0.25,
                    long_sil_sec: float = 0.6) -> np.ndarray:
     """Kokoro leaves 1.2-1.6s dead air after some sentence ends; compress any
     internal silence longer than `long_sil_sec` down to `max_pause_sec` so
@@ -59,7 +59,7 @@ def seg_wav(text: str, out: Path):
     from kokoro import KPipeline
     pipeline = KPipeline(lang_code=T["lang_code"])
     chunks = []
-    for _, _, audio in pipeline(text, voice=T["voice"]):
+    for _, _, audio in pipeline(text, voice=T["voice"], speed=T.get("speed", 1.0)):
         chunks.append(audio)
     wav = torch.cat(chunks, dim=0).numpy()
     wav = tighten_pauses(wav, T["sample_rate"])
