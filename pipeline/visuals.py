@@ -285,6 +285,22 @@ def download_retry(url: str, dest: Path, tries: int = 4) -> bool:
     return False
 
 
+def microlink_screenshot(page_url: str):
+    """Full-page screenshot of a source article/post via Microlink.
+    The documentary fallback: showing the actual source is always
+    relevant and never a wrong visual."""
+    try:
+        r = requests.get("https://api.microlink.io",
+                         params={"url": page_url, "screenshot": "true",
+                                 "meta": "false", "waitForTimeout": 3000},
+                         timeout=90).json()
+        if r.get("status") == "success":
+            return ((r.get("data") or {}).get("screenshot") or {}).get("url")
+    except Exception as e:
+        print(f"[visuals] screenshot failed for '{page_url[:60]}': {e}")
+    return None
+
+
 def norm_w(w: str) -> str:
     return re.sub(r"[^a-z0-9]", "", w.lower())
 
@@ -316,7 +332,7 @@ def match_shot(shot_text: str, seg_words, seg_start: float, seg_end: float):
 
 
 def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
-                 idx: int):
+                 idx: int, page_urls: list = None):
     """Resolve one visual per the evidence/illustrative tier. Returns
     (kind, path, source). Source is explicit — a wrong or generic visual
     is a hallucination vector, so fallbacks are labeled, never silent."""
@@ -386,6 +402,25 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                         print(f"[visuals] download failed for '{qq}': {e}")
                         mdest.unlink(missing_ok=True)
     if path is None:
+        # Documentary fallback: screenshot the actual source article/post.
+        # Always relevant, never a wrong visual.
+        for purl in (page_urls or []):
+            if path:
+                break
+            surl = microlink_screenshot(purl)
+            if surl:
+                try:
+                    dest = CACHE / f"screenshot_{slug(purl)}.jpg"
+                    download(surl, dest)
+                    if dest.stat().st_size > 10_000:
+                        kind, path, source = "photo", str(dest), "screenshot"
+                        print(f"[visuals] shot {idx}: screenshot "
+                              f"'{purl[:60]}' -> photo")
+                    else:
+                        dest.unlink(missing_ok=True)
+                except Exception as e:
+                    print(f"[visuals] screenshot download failed: {e}")
+    if path is None:
         path = str(ROOT / "output" / f"card_{idx:02d}.png")
         title_card(script_title, Path(path), w, h)
         kind, source = "card", "title-card"
@@ -409,8 +444,10 @@ def main():
     visuals = []
 
     # Pre-pass per story, in relevance order:
-    #   1. the story's own X post video (x_media_url, or x.com story URL)
-    #   2. the publisher's own page media (og:video / og:image)
+    #   1. the publisher's own page media (og:video / og:image) — editorially
+    #      chosen for the story, the most reliable match.
+    #   2. the story's own X post video (x_media_url, or x.com story URL) —
+    #      primary source when the story broke on X.
     # Later shots fall through to the evidence/illustrative loop below.
     story_assets = {}  # sid -> [(kind, local_path), ...]
     for sid, src in zip(script.get("story_ids", []),
@@ -418,27 +455,6 @@ def main():
         if not sid:
             continue
         assets = []
-        xurl = src.get("x_media_url") or ""
-        if not xurl:
-            u = src.get("url", "")
-            xurl = u if ("x.com" in u and "/status/" in u) else ""
-        if xurl:
-            dest = CACHE / f"xmedia_{slug(sid)}.mp4"
-            try:
-                if dest.stat().st_size < 10_000:
-                    raise FileNotFoundError
-            except FileNotFoundError:
-                try:
-                    mp4 = fxtwitter_mp4(xurl)
-                    if mp4 and fetch_trimmed_video(mp4, dest):
-                        print(f"[visuals] story {sid[:8]}: X post video -> clip")
-                    else:
-                        dest.unlink(missing_ok=True)
-                except Exception as e:
-                    print(f"[visuals] X video failed for '{xurl[:60]}': {e}")
-                    dest.unlink(missing_ok=True)
-            if dest.exists() and dest.stat().st_size >= 10_000:
-                assets.append(("clip", str(dest)))
         wkind, wurl = website_media(src.get("url", ""))
         if wurl:
             ext = ".mp4" if wkind == "clip" else ".jpg"
@@ -463,6 +479,27 @@ def main():
                     dest.unlink(missing_ok=True)
             if dest.exists() and dest.stat().st_size >= 10_000:
                 assets.append((wkind, str(dest)))
+        xurl = src.get("x_media_url") or ""
+        if not xurl:
+            u = src.get("url", "")
+            xurl = u if ("x.com" in u and "/status/" in u) else ""
+        if xurl:
+            dest = CACHE / f"xmedia_{slug(sid)}.mp4"
+            try:
+                if dest.stat().st_size < 10_000:
+                    raise FileNotFoundError
+            except FileNotFoundError:
+                try:
+                    mp4 = fxtwitter_mp4(xurl)
+                    if mp4 and fetch_trimmed_video(mp4, dest):
+                        print(f"[visuals] story {sid[:8]}: X post video -> clip")
+                    else:
+                        dest.unlink(missing_ok=True)
+                except Exception as e:
+                    print(f"[visuals] X video failed for '{xurl[:60]}': {e}")
+                    dest.unlink(missing_ok=True)
+            if dest.exists() and dest.stat().st_size >= 10_000:
+                assets.append(("clip", str(dest)))
         if assets:
             story_assets[sid] = assets
 
@@ -474,6 +511,13 @@ def main():
             [ww for ww in words if ww["start"] >= s - 0.05 and ww["start"] < e])
 
     story_asset_n = {}
+    # story_id -> [article_url, x_media_url] for the screenshot fallback.
+    sid_to_urls = {}
+    for sid, src in zip(script.get("story_ids", []),
+                        script.get("sources", [])):
+        if sid:
+            sid_to_urls[sid] = [u for u in (src.get("url"),
+                                            src.get("x_media_url")) if u]
     for i, seg in enumerate(script["segments"]):
         sid = seg.get("story_id")
         seg_kind = seg.get("kind", "story")  # hook | headlines | story
@@ -516,7 +560,10 @@ def main():
                 source = "story-owned"
                 print(f"[visuals] shot {idx}: story-owned {kind} -> {kind}")
             else:
-                kind, path, source = fetch_visual(sh, dur, w, h, script["title"], idx)
+                page_urls = sid_to_urls.get(sid, [])
+                kind, path, source = fetch_visual(sh, dur, w, h,
+                                                 script["title"], idx,
+                                                 page_urls)
             entry = {"idx": idx, "segment": i, "kind": kind,
                      "path": path, "duration": round(dur, 3),
                      "seg_kind": seg_kind, "start": round(s_time, 3),
