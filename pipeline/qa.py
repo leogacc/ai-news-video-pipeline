@@ -58,7 +58,13 @@ def main():
     if ass.exists():
         words_spoken = sum(len(s["text"].split()) for s in
                            json.loads((ROOT / "output" / "script.json").read_text())["segments"])
-        words_cap = ass.read_text().count("\\kf")
+        # Phrase-card captions: count words across Dialogue texts.
+        words_cap = 0
+        for ln in ass.read_text().splitlines():
+            if ln.startswith("Dialogue:"):
+                parts = ln.split(",", 9)
+                if len(parts) == 10:
+                    words_cap += len(parts[9].strip().split())
         check("caption coverage", words_cap >= 0.8 * words_spoken,
               f"({words_cap}/{words_spoken} words)")
 
