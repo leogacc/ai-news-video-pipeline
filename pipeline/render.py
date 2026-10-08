@@ -44,13 +44,25 @@ def main():
     for v in visuals:
         i, dur = v["idx"], v["duration"]
         out = seg_dir / f"shot_{i:02d}.mp4"
+        logo = v.get("logo")
+        # Logo overlay: company identifier composited top-right over the
+        # base scene (rule 7: company + action -> layer them).
+        def with_logo(base_vf, main_args):
+            lvf = (f"{base_vf}[base];"
+                   f"[1:v]scale=220:-1:flags=lanczos,format=rgba[lg];"
+                   f"[base][lg]overlay=W-w-40:40")
+            return (["ffmpeg", "-y"] + main_args +
+                    ["-loop", "1", "-i", logo,
+                     "-t", f"{dur:.2f}", "-filter_complex", lvf])
         if v["kind"] == "clip":
             vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,"
                   f"crop={w}:{h},fps={fps},setsar=1")
-            run(["ffmpeg", "-y", "-stream_loop", "-1", "-i", v["path"],
-                 "-t", f"{dur:.2f}", "-vf", vf, "-an",
-                 "-c:v", "libx264", "-preset", preset, "-crf", "23",
-                 str(out)])
+            base = ["-stream_loop", "-1", "-i", v["path"]]
+            cmd = (with_logo(f"[0:v]{vf}", base) if logo else
+                   ["ffmpeg", "-y"] + base +
+                   ["-t", f"{dur:.2f}", "-vf", vf])
+            run(cmd + ["-an", "-c:v", "libx264", "-preset", preset,
+                       "-crf", "23", str(out)])
         else:  # photo / title card -> Ken Burns zoom, speed by segment kind
             frames = max(1, int(dur * fps))
             rate = ZOOM_RATE.get(v.get("seg_kind", "story"), 0.0009)
@@ -65,11 +77,12 @@ def main():
                   f"crop={w*2}:{h*2},"
                   f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
                   f"y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps={fps},setsar=1")
-            run(["ffmpeg", "-y", "-loop", "1", "-framerate", str(fps),
-                 "-t", f"{dur:.2f}", "-i", v["path"],
-                 "-vf", vf, "-frames:v", str(frames), "-an",
-                 "-c:v", "libx264", "-preset", preset, "-crf", "23",
-                 str(out)])
+            base = ["-loop", "1", "-framerate", str(fps), "-i", v["path"]]
+            cmd = (with_logo(f"[0:v]{vf}", base) if logo else
+                   ["ffmpeg", "-y"] + base + ["-vf", vf])
+            run(cmd + ["-t", f"{dur:.2f}", "-frames:v", str(frames), "-an",
+                       "-c:v", "libx264", "-preset", preset, "-crf", "23",
+                       str(out)])
         seg_files.append(out)
 
     lst = ROOT / "output" / "concat.txt"
