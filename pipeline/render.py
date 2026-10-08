@@ -12,6 +12,7 @@ and a failed segment doesn't nuke a 40-minute encode.
 """
 import json
 import random
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -42,8 +43,8 @@ def main():
     # already move, so they never get artificial motion.
     ZOOM_RATE = {"hook": 0.0028, "headlines": 0.0016, "story": 0.0009}
     for v in visuals:
-        i, dur = v["segment"], v["duration"]
-        out = seg_dir / f"seg_{i:02d}.mp4"
+        i, dur = v["idx"], v["duration"]
+        out = seg_dir / f"shot_{i:02d}.mp4"
         if v["kind"] == "clip":
             vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,"
                   f"crop={w}:{h},fps={fps},setsar=1")
@@ -59,7 +60,11 @@ def main():
             # so zoom-out is expressed as a decreasing function of 'on'.
             z = (f"min(1+{rate}*on,1.18)" if zoom == "in"
                  else f"max(1.18-{rate}*on,1.0)")
-            vf = (f"scale={w*2}:-2,zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
+            # Center-crop to 9:16 BEFORE zoompan: zoompan stretches its zoom
+            # window to the output size, so wide photos came out squeezed.
+            vf = (f"scale={w*2}:{h*2}:force_original_aspect_ratio=increase,"
+                  f"crop={w*2}:{h*2},"
+                  f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
                   f"y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps={fps},setsar=1")
             run(["ffmpeg", "-y", "-loop", "1", "-framerate", str(fps),
                  "-t", f"{dur:.2f}", "-i", v["path"],
@@ -94,9 +99,33 @@ def main():
         amap = "[aout]"
 
     final = ROOT / "output" / f"ainews_{mode}.mp4"
+    # Emphasis overlays: big keyword text per segment (upper third, so it
+    # never fights the mid-frame karaoke captions).
+    vf_parts = [f"ass={captions}"]
+    script = json.loads((ROOT / "output" / "script.json").read_text())
+    seg_bounds, cur_seg, cur_start, t_acc = {}, None, 0.0, 0.0
+    for v in visuals:
+        if v["segment"] != cur_seg:
+            if cur_seg is not None:
+                seg_bounds[cur_seg] = (cur_start, t_acc)
+            cur_seg, cur_start = v["segment"], t_acc
+        t_acc += v["duration"]
+    if cur_seg is not None:
+        seg_bounds[cur_seg] = (cur_start, t_acc)
+    for si, seg in enumerate(script["segments"]):
+        emph = (seg.get("emphasis") or "").strip()
+        if not emph or si not in seg_bounds:
+            continue
+        safe = re.sub(r"[^A-Za-z0-9 $%.,!?-]", "", emph).replace(":", "\\:")
+        s0, s1 = seg_bounds[si]
+        vf_parts.append(
+            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/"
+            f"DejaVuSans-Bold.ttf:text='{safe}':fontsize=96:"
+            f"fontcolor=white:borderw=4:bordercolor=black@0xAA:"
+            f"x=(w-text_w)/2:y=h*0.24:enable='between(t,{s0:.2f},{s1:.2f})'")
     run(["ffmpeg", "-y", *inputs,
          "-filter_complex", afilter,
-         "-vf", f"ass={captions}",
+         "-vf", ",".join(vf_parts),
          "-map", "0:v", "-map", amap,
          "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
          "-r", str(fps), "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
