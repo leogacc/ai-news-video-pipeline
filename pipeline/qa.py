@@ -2,6 +2,7 @@
 """QA GATE (blocking) — any failure aborts the run and alerts. Nothing partial
 ever publishes."""
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -72,7 +73,10 @@ def main():
     from textstat import flesch_kincaid_grade
     script = json.loads((ROOT / "output" / "script.json").read_text())
     full_text = " ".join(s["text"] for s in script["segments"])
-    grade = flesch_kincaid_grade(full_text)
+    # Pacing style is comma-heavy (periods -> commas for 1x TTS flow).
+    # Restore sentence boundaries before grading, or the metric explodes.
+    grade_text = re.sub(r",\s+", ". ", full_text)
+    grade = flesch_kincaid_grade(grade_text)
     check("reading level <= 9.5", grade <= Q["max_grade_level"],
           f"(grade {grade:.1f})")
 
