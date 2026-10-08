@@ -2,7 +2,8 @@
 """PRODUCER (render) — two-pass ffmpeg.
 
 Pass 1: each segment -> 1080x1920 (or 1280x720) clip. Clips are center-cropped;
-title cards get a slow Ken Burns zoom via zoompan.
+stills (photos, title cards) get a Ken Burns zoom whose speed follows the
+segment kind: hook punches in fast, headlines drift, stories settle slow.
 Pass 2: concat -> burn karaoke captions -> mix narration + ducked music bed ->
 loudnorm -> H.264 MP4 with faststart.
 
@@ -36,6 +37,10 @@ def main():
     seg_dir.mkdir(exist_ok=True)
 
     seg_files = []
+    # Ken Burns speed by segment kind: the hook punches in fast, headlines
+    # drift at medium speed, story breakdowns get a slow settle. Clips
+    # already move, so they never get artificial motion.
+    ZOOM_RATE = {"hook": 0.0028, "headlines": 0.0016, "story": 0.0009}
     for v in visuals:
         i, dur = v["segment"], v["duration"]
         out = seg_dir / f"seg_{i:02d}.mp4"
@@ -46,13 +51,14 @@ def main():
                  "-t", f"{dur:.2f}", "-vf", vf, "-an",
                  "-c:v", "libx264", "-preset", preset, "-crf", "23",
                  str(out)])
-        else:  # title card -> slow Ken Burns zoom
+        else:  # photo / title card -> Ken Burns zoom, speed by segment kind
             frames = max(1, int(dur * fps))
+            rate = ZOOM_RATE.get(v.get("seg_kind", "story"), 0.0009)
             zoom = random.choice(["in", "out"])
             # 'on' = output frame count; zoompan always starts at zoom=1,
             # so zoom-out is expressed as a decreasing function of 'on'.
-            z = ("min(1+0.0009*on,1.18)" if zoom == "in"
-                 else "max(1.18-0.0009*on,1.0)")
+            z = (f"min(1+{rate}*on,1.18)" if zoom == "in"
+                 else f"max(1.18-{rate}*on,1.0)")
             vf = (f"scale={w*2}:-2,zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
                   f"y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps={fps},setsar=1")
             run(["ffmpeg", "-y", "-loop", "1", "-framerate", str(fps),
