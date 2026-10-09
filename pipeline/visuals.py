@@ -20,13 +20,157 @@ CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
 V = CFG["visuals"]
 CACHE = ROOT / "cache" / "clips"
 CACHE.mkdir(parents=True, exist_ok=True)
+# Agent-verified pins: searched and relevance-checked by the research
+# loop (never blind search). Outranks every other source.
+VCACHE = ROOT / "cache" / "verified"
+VCACHE.mkdir(parents=True, exist_ok=True)
 
 
 def slug(q: str) -> str:
     return hashlib.sha1(q.lower().encode()).hexdigest()[:12]
 
 
-def pexels_search(query: str):
+# --- Semantic clip library (2026-10-09): match-then-generate, lite. ---
+# Reuses previously fetched stock clips for semantically similar queries
+# instead of hitting the network for near-duplicate searches. Token-overlap
+# scoring (>= 0.6 with >= 2 shared content tokens); illustrative tier only
+# — evidence shots never come from here, and verified pins always outrank it.
+LIBCAT = VCACHE / "clip_catalog.json"
+_LIB_STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "for", "with",
+             "and", "or", "is", "are", "was", "were", "be", "by", "as",
+             "from", "that", "this", "it", "its", "video", "videos",
+             "footage", "clip", "clips", "photo", "photos", "image",
+             "images", "showing", "show", "shows", "shot", "background"}
+
+
+def _lib_tokens(q: str) -> set:
+    return {t for t in re.findall(r"[a-z0-9]+", q.lower())
+            if t not in _LIB_STOP}
+
+
+def _load_catalog() -> dict:
+    try:
+        return json.loads(LIBCAT.read_text())
+    except Exception:
+        return {}
+
+
+def _save_catalog(cat: dict):
+    LIBCAT.write_text(json.dumps(cat, indent=1))
+
+
+def library_register(query: str, kind: str, path: Path):
+    """Remember a fetched stock clip under its query for future reuse."""
+    cat = _load_catalog()
+    cat[slug(query)] = {"query": query, "tokens": sorted(_lib_tokens(query)),
+                        "kind": kind, "path": str(path)}
+    _save_catalog(cat)
+
+
+def library_match(query: str, prev_path: str = None):
+    """(kind, path) of the best catalog clip for a similar query, or None.
+    Skips prev_path so two adjacent shots never freeze on one clip."""
+    qt = _lib_tokens(query)
+    if not qt:
+        return None
+    best, best_score = None, 0.0
+    for e in _load_catalog().values():
+        p = Path(e["path"])
+        if not p.exists() or p.stat().st_size < 10_000:
+            continue
+        if prev_path and str(p) == str(prev_path):
+            continue
+        inter = qt & set(e.get("tokens", []))
+        if len(inter) < 2:
+            continue
+        score = len(inter) / len(qt)
+        if score >= 0.6 and score > best_score:
+            best, best_score = (e["kind"], str(p)), score
+    if best:
+        print(f"[visuals] clip-library: '{query}' -> {Path(best[1]).name} "
+              f"(overlap {best_score:.2f})")
+    return best
+
+
+# --- QA-quarantine retry support (2026-10-09). ---
+# On a quarantine retry, run.py sets VISUALS_BAN to the slugs of the stock
+# clips used in the failed render and VISUALS_RETRY=1: banned files are
+# deleted so they re-fetch, and searches return their 2nd hit instead of
+# the 1st — the retry genuinely shows different clips.
+def _banned_slugs() -> set:
+    return {s for s in os.environ.get("VISUALS_BAN", "").split(",") if s}
+
+
+def _retry_mode() -> bool:
+    return os.environ.get("VISUALS_RETRY") == "1"
+
+
+def _image_has_content(path: Path) -> bool:
+    """Reject degenerate images (uniform black/white squares) — a logo
+    fetcher once put a corporate flowchart and black squares on screen
+    as 'logos', so even verified pins get a sanity check."""
+    try:
+        from PIL import Image, ImageStat
+        st = ImageStat.Stat(Image.open(path).convert("RGB"))
+        return sum(st.var) > 50
+    except Exception:
+        return False
+
+
+def verified_logo(company: str):
+    """Logo overlay source: ONLY an agent-verified pin. The research loop
+    web-searches the company's official logo, eyeball-verifies it IS the
+    mark (not a diagram, photo, or article), and pins it to
+    cache/verified/logo_{company}.png. No pin -> no overlay (honest miss),
+    never a blind fetch: Commons sourcing once shipped a flowchart and
+    black squares as 'logos', and Commons is banned from the pipeline
+    entirely per the 2026-10-08 sourcing policy."""
+    safe = re.sub(r"[^a-z0-9]+", "_", company.lower()).strip("_")
+    dest = VCACHE / f"logo_{safe}.png"
+    if dest.exists() and dest.stat().st_size > 2000 \
+            and _image_has_content(dest):
+        return dest
+    return None
+
+
+# Logo-overlay allowlist: the overlay company must be the shot's visual
+# subject (or its product). Story-level tagging ("story is about OpenAI" ->
+# OpenAI logo on a Wikimedia article shot) is exactly the bug this blocks.
+_LOGO_ALIASES = {
+    "openai": {"openai", "chatgpt", "gpt4", "gpt5", "sora", "dalle", "textgrain"},
+    "anthropic": {"anthropic", "claude", "haiku", "opus", "sonnet"},
+    "google": {"google", "gemini", "synthid", "deepmind", "veo", "notebooklm",
+               "projectastra"},
+    "x": {"xai", "grok"},
+    "meta": {"meta", "llama", "facebook", "instagram", "whatsapp"},
+    "microsoft": {"microsoft", "copilot"},
+    "nvidia": {"nvidia"},
+    "apple": {"apple"},
+    "spacex": {"spacex"},
+}
+
+
+def logo_allowed(company: str, subject: str, visual_type: str) -> bool:
+    """True only if `company`'s logo belongs on this shot: the shot must be
+    evidence (never illustrative) whose visual_subject names the company or
+    one of its products."""
+    if visual_type == "illustrative" or not company or not subject:
+        return False
+    co = re.sub(r"[^a-z0-9]", "", company.lower())
+    aliases = _LOGO_ALIASES.get(co, {co})
+    tokens = re.findall(r"[a-z0-9]+", subject.lower())
+    for alias in aliases:
+        for tok in tokens:
+            if alias == tok:
+                return True
+            # substring only for longer aliases: "x" must never match
+            # "wikimedia", "gpt" must never match "chatgpt"-less strings.
+            if len(alias) >= 4 and (alias in tok or tok in alias):
+                return True
+    return False
+
+
+def pexels_search(query: str, offset: int = 0):
     key = os.environ.get("PEXELS_API_KEY")
     if not key:
         return None
@@ -38,6 +182,7 @@ def pexels_search(query: str):
         headers={"Authorization": key},
         timeout=30)
     r.raise_for_status()
+    cands = []
     for v in r.json().get("videos", []):
         files = [f for f in v.get("video_files", [])
                  if f.get("height", 0) >= 480 and f.get("link")]
@@ -46,12 +191,13 @@ def pexels_search(query: str):
         # smallest file that still clears 480p keeps downloads light
         files.sort(key=lambda f: f["height"])
         small = [f for f in files if f["height"] <= V["clip_max_height"]]
-        return (small or files)[0]["link"]
-    return None
+        cands.append((small or files)[0]["link"])
+    return cands[offset] if offset < len(cands) else None
 
 
-def pixabay_media(query: str, kind: str = "videos"):
-    """kind = "videos" -> clips, "photos" -> stills (Ken Burns at render)."""
+def pixabay_media(query: str, kind: str = "videos", offset: int = 0):
+    """kind = "videos" -> clips, "photos" -> stills (Ken Burns at render).
+    offset picks the Nth search hit (quarantine retries take the 2nd)."""
     key = os.environ.get("PIXABAY_API_KEY")
     if not key:
         return None
@@ -64,109 +210,29 @@ def pixabay_media(query: str, kind: str = "videos"):
             "image_type": "photo", "orientation": "vertical"}
     r = requests.get(endpoint, params=params, timeout=30)
     r.raise_for_status()
+    cands = []
     for hit in r.json().get("hits", []):
         if kind == "videos":
             vids = hit.get("videos", {})
             for quality in ("medium", "small", "large"):
                 if quality in vids:
-                    return vids[quality]["url"]
+                    cands.append(vids[quality]["url"])
+                    break
         else:
             link = hit.get("largeImageURL") or hit.get("webformatURL")
             if link:
-                return link
-    return None
+                cands.append(link)
+    return cands[offset] if offset < len(cands) else None
 
 
 def download(url: str, dest: Path):
-    # A real User-Agent: thumb.wikimedia.org 403s generic clients.
+    # A real User-Agent: some hosts 403 generic clients.
     with requests.get(url, stream=True, timeout=120,
-                      headers=COMMONS_UA) as r:
+                      headers={"User-Agent": "ai-news-video-pipeline/1.0"}) as r:
         r.raise_for_status()
         with open(dest, "wb") as f:
             for chunk in r.iter_content(1 << 20):
                 f.write(chunk)
-
-
-COMMONS_UA = {"User-Agent":
-              "ai-news-video-pipeline/1.0 (educational news digest)"}
-
-
-def commons_image(subject: str):
-    """Evidence shot from Wikimedia Commons (freely licensed): the specific
-    thing named by `subject` (person, logo, landmark, product). Returns a
-    direct jpg/png URL or None."""
-    try:
-        s = requests.get(
-            "https://commons.wikimedia.org/w/api.php",
-            params={"action": "query", "format": "json", "list": "search",
-                    "srsearch": f"{subject} filetype:jpg",
-                    "srnamespace": 6, "srlimit": 8},
-            headers=COMMONS_UA, timeout=30).json()
-        titles = [h["title"] for h in s.get("query", {}).get("search", [])]
-        if not titles:
-            return None
-        ii = requests.get(
-            "https://commons.wikimedia.org/w/api.php",
-            params={"action": "query", "format": "json",
-                    "prop": "imageinfo", "iiprop": "url|size",
-                    "iiurlwidth": 1280, "titles": "|".join(titles)},
-            headers=COMMONS_UA, timeout=30).json()
-        for p in ii.get("query", {}).get("pages", {}).values():
-            for info in p.get("imageinfo", []):
-                u = info.get("thumburl") or info.get("url", "")
-                if u.lower().split("?")[0].endswith((".jpg", ".jpeg", ".png")):
-                    return u
-    except Exception as e:
-        print(f"[visuals] commons failed for '{subject}': {e}")
-    return None
-
-
-def fetch_logo(company: str):
-    """Company logo PNG from Wikimedia Commons, for overlaying on shots
-    whose sentence names both the company and an action. SVG originals are
-    rasterized by Commons' thumbnailer (iiurlwidth), so the thumb URL is a
-    real PNG. Returns a local path or None."""
-    # Disambiguation for single-letter / generic names.
-    query = {"X": "X (social network) logo"}.get(company, f"{company} logo")
-    safe = re.sub(r"[^a-z0-9]+", "_", company.lower()).strip("_")
-    dest = ROOT / "cache" / "logos" / f"{safe}.png"
-    if dest.exists() and dest.stat().st_size > 2000:
-        return dest
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        s = requests.get(
-            "https://commons.wikimedia.org/w/api.php",
-            params={"action": "query", "format": "json", "list": "search",
-                    "srsearch": query, "srnamespace": 6, "srlimit": 8},
-            headers=COMMONS_UA, timeout=30).json()
-        titles = [h["title"] for h in s.get("query", {}).get("search", [])]
-        if not titles:
-            return None
-        ii = requests.get(
-            "https://commons.wikimedia.org/w/api.php",
-            params={"action": "query", "format": "json",
-                    "prop": "imageinfo", "iiprop": "url|size|timestamp",
-                    "iiurlwidth": 400, "titles": "|".join(titles)},
-            headers=COMMONS_UA, timeout=30).json()
-        # Newest upload first: brand marks go stale (e.g. 2017 wordmarks
-        # lingering next to current logos). Freshness beats relevance rank.
-        cands = []
-        for p in ii.get("query", {}).get("pages", {}).values():
-            for info in p.get("imageinfo", []):
-                u = info.get("thumburl") or info.get("url", "")
-                # SVG originals come back as rasterized .svg.png thumbs.
-                if u.lower().split("?")[0].endswith(".png"):
-                    cands.append((info.get("timestamp", ""), u))
-        cands.sort(reverse=True)
-        for _, u in cands:
-            download(u, dest)
-            if dest.stat().st_size > 2000:
-                return dest
-            dest.unlink(missing_ok=True)
-        return None
-    except Exception as e:
-        print(f"[visuals] logo failed for '{company}': {e}")
-    return None
 
 
 def title_card(text: str, dest: Path, w: int, h: int):
@@ -267,9 +333,45 @@ def website_media(article_url: str):
     return None, None
 
 
+_FACE_MODEL = ROOT / "cache" / "models" / "face_yunet.onnx"
+
+
+def detect_face(path):
+    """Largest face center as (fx, fy) in 0..1, measured in the
+    center-cropped 9:16 region — i.e. what the final frame shows.
+    None when no face is found. Uses OpenCV's YuNet DNN detector."""
+    try:
+        import cv2
+        img = cv2.imread(str(path))
+        if img is None or not _FACE_MODEL.exists():
+            return None
+        H, W = img.shape[:2]
+        ratio = 9 / 16
+        if W / H > ratio:  # wider than 9:16 -> crop sides
+            cw = int(H * ratio)
+            x0 = (W - cw) // 2
+            crop = img[:, x0:x0 + cw]
+        else:  # taller -> crop top/bottom
+            ch = int(W / ratio)
+            y0 = (H - ch) // 2
+            crop = img[y0:y0 + ch, :]
+        ch, cw = crop.shape[:2]
+        det = cv2.FaceDetectorYN_create(str(_FACE_MODEL), "",
+                                        (cw, ch), 0.5, 0.3, 5000)
+        _, faces = det.detect(crop)
+        if faces is None or len(faces) == 0:
+            return None
+        x, y, w, h = max(faces, key=lambda f: f[2] * f[3])[:4]
+        return [round(float(x + w / 2) / cw, 3),
+                round(float(y + h / 2) / ch, 3)]
+    except Exception as e:
+        print(f"[visuals] face detect failed for '{path}': {e}")
+        return None
+
+
 def download_retry(url: str, dest: Path, tries: int = 4) -> bool:
-    """Download with exponential backoff. Wikimedia rate-limits thumbnail
-    fetches (HTTP 429); the file is usually fine a few seconds later."""
+    """Download with exponential backoff (some hosts rate-limit with
+    HTTP 429; the file is usually fine a few seconds later)."""
     for attempt in range(tries):
         try:
             download(url, dest)
@@ -285,14 +387,53 @@ def download_retry(url: str, dest: Path, tries: int = 4) -> bool:
     return False
 
 
-def microlink_screenshot(page_url: str):
-    """Full-page screenshot of a source article/post via Microlink.
-    The documentary fallback: showing the actual source is always
-    relevant and never a wrong visual."""
+def clip_review_strip(clip: Path, idx: int):
+    """3 frames (25/50/75%) tiled into output/clip_review/ for the frame
+    review step — a single contact-sheet frame can't judge a clip."""
     try:
-        r = requests.get("https://api.microlink.io",
-                         params={"url": page_url, "screenshot": "true",
-                                 "meta": "false", "waitForTimeout": 3000},
+        import subprocess
+        from PIL import Image
+        d = ROOT / "output" / "clip_review"
+        d.mkdir(parents=True, exist_ok=True)
+        dur = float(subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(clip)],
+            capture_output=True, text=True).stdout.strip() or 1)
+        frames = []
+        for frac in (0.25, 0.5, 0.75):
+            fp = d / f"_{idx}_{int(frac*100)}.png"
+            subprocess.run(["/usr/bin/ffmpeg", "-y", "-v", "error",
+                            "-ss", f"{dur*frac:.2f}", "-i", str(clip),
+                            "-frames:v", "1", str(fp)], check=True)
+            im = Image.open(fp).convert("RGB")
+            im.thumbnail((240, 240), Image.LANCZOS)
+            frames.append(im)
+            fp.unlink()
+        strip = Image.new("RGB",
+                          (sum(f.width for f in frames) + 20, frames[0].height),
+                          (15, 15, 15))
+        x = 0
+        for f in frames:
+            strip.paste(f, (x, 0))
+            x += f.width + 10
+        strip.save(d / f"clip_{idx:02d}.jpg", quality=85)
+        print(f"[visuals] shot {idx}: clip review strip saved")
+    except Exception as e:
+        print(f"[visuals] clip strip failed: {e}")
+
+
+def microlink_screenshot(page_url: str):
+    """Screenshot of a source article/post via Microlink.
+    The documentary fallback: showing the actual source is always
+    relevant and never a wrong visual. x.com pages get a narrow viewport
+    so the screenshot is the post column, not the login sidebar."""
+    try:
+        params = {"url": page_url, "screenshot": "true",
+                  "meta": "false", "waitForTimeout": 3000}
+        if "x.com" in page_url or "twitter.com" in page_url:
+            params["viewport.width"] = "900"
+            params["viewport.height"] = "1400"
+        r = requests.get("https://api.microlink.io", params=params,
                          timeout=90).json()
         if r.get("status") == "success":
             return ((r.get("data") or {}).get("screenshot") or {}).get("url")
@@ -301,21 +442,41 @@ def microlink_screenshot(page_url: str):
     return None
 
 
+def crop_x_screenshot(path: Path):
+    """Crop an x.com screenshot to the post column, dropping the login
+    sidebar / QR / 'relevant people' rail on the right."""
+    from PIL import Image
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    cut = int(w * 0.63)
+    im.crop((0, 0, cut, h)).save(path, quality=92)
+    print(f"[visuals] x screenshot cropped {w}x{h} -> {cut}x{h}")
+
+
 def norm_w(w: str) -> str:
     return re.sub(r"[^a-z0-9]", "", w.lower())
 
 
-def match_shot(shot_text: str, seg_words, seg_start: float, seg_end: float):
-    """(start, end) timestamps for a shot by matching its words against the
-    whisper word stream. Falls back to None."""
+def match_shot(shot_text: str, seg_words, seg_start: float, seg_end: float,
+               start_idx: int = 0):
+    """(start, end, end_idx) timestamps for a shot by matching its words
+    against the word stream. Falls back to None.
+
+    start_idx: only consider matches at/after this word index — shots are
+    matched SEQUENTIALLY, so a shot whose opening word repeats an earlier
+    shot's ("Google ... Google says ...") can't steal the earlier shot's
+    timing. Without this, duplicate openers collapse two shots onto the
+    same start and the segment's visual timing corrupts.
+    """
     want = [norm_w(w) for w in shot_text.split()]
     want = [w for w in want if w]
     if not want or not seg_words:
         return None
     have = [norm_w(w["word"]) for w in seg_words]
-    # Find the want sequence as an ordered subsequence of have.
+    # Find the want sequence as an ordered subsequence of have, at/after
+    # start_idx. Prefer the TIGHTEST span (closest to a verbatim run).
     best = None
-    for s in range(len(have)):
+    for s in range(start_idx, len(have)):
         if have[s] != want[0]:
             continue
         h, wi = s, 0
@@ -324,53 +485,71 @@ def match_shot(shot_text: str, seg_words, seg_start: float, seg_end: float):
                 wi += 1
             h += 1
         if wi == len(want):
-            best = (seg_words[s]["start"], seg_words[h - 1]["end"])
-            break
-    if best:
-        return best
-    return None
+            cand = (seg_words[s]["start"], seg_words[h - 1]["end"], h)
+            if best is None or (cand[1] - cand[0]) < (best[1] - best[0]):
+                best = cand
+    return best
 
 
 def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
-                 idx: int, page_urls: list = None):
+                 idx: int, page_urls: list = None, prev_path: str = None):
     """Resolve one visual per the evidence/illustrative tier. Returns
     (kind, path, source). Source is explicit — a wrong or generic visual
-    is a hallucination vector, so fallbacks are labeled, never silent."""
+    is a hallucination vector, so fallbacks are labeled, never silent.
+
+    Sourcing policy (user, 2026-10-08): the agent research loop searches
+    and verifies relevance, pinning verified files into the cache. The
+    pipeline itself NEVER queries Commons or stock for evidence shots —
+    blind search results hallucinate (log cabin for "Lean", machinery for
+    "X Lift", wrong monuments). Stock is reserved for notable generic
+    actions (the illustrative tier) only.
+    """
     vtype = spec.get("visual_type", "illustrative")
     q = spec.get("broll") or "technology abstract"
+    banned = _banned_slugs()
+    retry = _retry_mode()
+    off = 1 if retry else 0  # quarantine retry: take the 2nd search hit
     clip_dest = CACHE / f"{slug(q)}.mp4"
     photo_dest = CACHE / f"{slug(q)}.jpg"
     kind, path, source = None, None, None
-    for cand in (clip_dest, photo_dest):
+    # Verified pins first (agent-searched, relevance-checked).
+    for cand in (VCACHE / f"{slug(q)}.mp4", VCACHE / f"{slug(q)}.jpg"):
         if cand.exists() and cand.stat().st_size >= 10_000:
             kind = "clip" if cand.suffix == ".mp4" else "photo"
             path = str(cand)
-            source = "cache"
+            source = "verified-pin"
             break
-    # Evidence tier: the visual IS the thing being discussed (person, logo,
-    # landmark, product) — Wikimedia Commons before stock.
+    # Legacy cache: blind stock downloads are reusable ONLY for the
+    # illustrative tier (stock's reserved purpose). Evidence shots must
+    # be verified pins — never legacy blind downloads. Banned slugs
+    # (quarantine retry) are skipped so the retry shows different clips.
+    if path is None and vtype == "illustrative" and slug(q) not in banned:
+        for cand in (clip_dest, photo_dest):
+            if cand.exists() and cand.stat().st_size >= 10_000:
+                kind = "clip" if cand.suffix == ".mp4" else "photo"
+                path = str(cand)
+                source = "cache"
+                break
+    # Semantic clip library: a proven clip for a similar past query beats
+    # a fresh blind search. Illustrative tier only.
+    if path is None and vtype == "illustrative":
+        lib = library_match(q, prev_path=prev_path)
+        if lib:
+            kind, path = lib
+            source = "clip-library"
+    # Evidence tier: the visual IS the thing (person, logo, landmark,
+    # product, document). Only agent-verified cache pins or the story's
+    # own media qualify — no Commons, no stock. Anything unpinned falls
+    # through to screenshot -> title card, never a blind guess.
     is_person = bool(spec.get("person"))
-    if path is None and vtype == "evidence" and spec.get("visual_subject"):
-        subj = spec["visual_subject"]
-        url = commons_image(subj)
-        if url:
-            dest = CACHE / f"commons_{slug(subj)}.jpg"
-            if download_retry(url, dest):
-                kind, path, source = "photo", str(dest), "commons"
-                print(f"[visuals] shot {idx}: commons '{subj}' -> photo")
-            else:
-                print(f"[visuals] commons download FAILED for '{subj}' "
-                      f"after retries")
     if path is None and is_person:
-        # Named people: stock sites have no editorial portraits. Querying
-        # them for a person's name returns garbage (a "jay" bird for
-        # "Jay Clayton"). Go straight to the title card — a missing visual
+        # Named people: never stock, never blind search. A missing visual
         # is honest, a wrong one is a hallucination.
         print(f"[visuals] shot {idx}: NO_FIND person "
-              f"'{spec.get('visual_subject')}' — title card, not stock")
-    if path is None and not (is_person and vtype == "evidence"):
-        # Bounded relevance loop: specific video -> specific photo ->
-        # broadened query video/photo -> title card.
+              f"'{spec.get('visual_subject')}' — screenshot/title, not stock")
+    if path is None and vtype == "illustrative":
+        # Stock is reserved for notable generic actions. Bounded relevance
+        # loop: specific video -> specific photo -> broadened query.
         queries = [q, " ".join(q.split()[:2])]
         for qq in queries:
             for mkind, mdest in (("videos", clip_dest),
@@ -378,14 +557,14 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                 if path:
                     break
                 try:
-                    url = pixabay_media(qq, mkind)
+                    url = pixabay_media(qq, mkind, offset=off)
                 except Exception as e:
                     print(f"[visuals] pixabay {mkind} failed for '{qq}': {e}")
                     url = None
                 provider = None
                 if not url and mkind == "videos":
                     try:
-                        url = pexels_search(qq)
+                        url = pexels_search(qq, offset=off)
                         provider = "pexels" if url else None
                     except Exception as e:
                         print(f"[visuals] pexels failed for '{qq}': {e}")
@@ -398,13 +577,26 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                         path = str(mdest)
                         source = provider or mkind
                         print(f"[visuals] shot {idx}: '{qq}' -> {kind} [{source}]")
+                        # Remember it: the clip library reuses proven
+                        # footage for similar future queries.
+                        library_register(qq, kind, mdest)
+                        if kind == "clip":
+                            # Blind stock is a hallucination vector (a night-
+                            # earth clip once illustrated "AI generated
+                            # images"). Save a 3-frame strip so the frame
+                            # review can eyeball the clip, not just one frame.
+                            clip_review_strip(mdest, idx)
                     except Exception as e:
                         print(f"[visuals] download failed for '{qq}': {e}")
                         mdest.unlink(missing_ok=True)
     if path is None:
         # Documentary fallback: screenshot the actual source article/post.
-        # Always relevant, never a wrong visual.
-        for purl in (page_urls or []):
+        # Always relevant, never a wrong visual. On a quarantine retry the
+        # first URL already failed QA, so start from the next one.
+        urls = page_urls or []
+        if _retry_mode() and len(urls) > 1:
+            urls = urls[1:] + urls[:1]
+        for purl in urls:
             if path:
                 break
             surl = microlink_screenshot(purl)
@@ -413,6 +605,26 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
                     dest = CACHE / f"screenshot_{slug(purl)}.jpg"
                     download(surl, dest)
                     if dest.stat().st_size > 10_000:
+                        if "x.com" in purl or "twitter.com" in purl:
+                            crop_x_screenshot(dest)
+                        # 2026-10-09: adjacent shots screenshotting the same
+                        # page got the byte-identical file and QA rejected
+                        # the run. Vary the crop per shot — still the actual
+                        # article, just a different band of the page — under
+                        # a distinct path so consecutive shots never match.
+                        if str(dest) == (prev_path or ""):
+                            from PIL import Image
+                            im = Image.open(dest).convert("RGB")
+                            w0, h0 = im.size
+                            band = int(h0 * 0.65)
+                            top = 0 if idx % 2 == 0 else h0 - band
+                            vdest = (CACHE /
+                                     f"screenshot_{slug(purl)}_v{idx}.jpg")
+                            im.crop((0, top, w0, top + band)).save(
+                                vdest, quality=88)
+                            dest = vdest
+                            print(f"[visuals] shot {idx}: screenshot variant "
+                                  f"crop (same page as previous shot)")
                         kind, path, source = "photo", str(dest), "screenshot"
                         print(f"[visuals] shot {idx}: screenshot "
                               f"'{purl[:60]}' -> photo")
@@ -425,11 +637,13 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
         title_card(script_title, Path(path), w, h)
         kind, source = "card", "title-card"
         print(f"[visuals] shot {idx}: '{q}' -> title card fallback")
-    # An evidence shot that fell back to generic stock is a wrong visual
-    # until proven otherwise — flag it loudly instead of passing silently.
-    if vtype == "evidence" and source in ("pixabay", "photos", "videos", "pexels"):
-        print(f"[visuals] shot {idx}: FALLBACK generic {kind} for evidence "
-              f"'{spec.get('visual_subject')}' — verify before publish")
+    # Evidence shots must never come from blind search — if one did, the
+    # sourcing policy was bypassed. Flag it loudly instead of passing
+    # silently.
+    if vtype == "evidence" and source in ("pixabay", "photos", "videos",
+                                          "pexels"):
+        print(f"[visuals] shot {idx}: POLICY VIOLATION — blind {source} "
+              f"used for evidence '{spec.get('visual_subject')}'")
     return kind, path, source
 
 
@@ -442,6 +656,14 @@ def main():
     w, h = CFG[mode]["width"], CFG[mode]["height"]
 
     visuals = []
+
+    # Quarantine retry: delete banned stock files so the re-fetch can't
+    # silently reuse the clips QA rejected.
+    for bs in _banned_slugs():
+        for cand in (CACHE / f"{bs}.mp4", CACHE / f"{bs}.jpg"):
+            if cand.exists():
+                cand.unlink()
+                print(f"[visuals] retry: banned clip removed ({cand.name})")
 
     # Pre-pass per story, in relevance order:
     #   1. the publisher's own page media (og:video / og:image) — editorially
@@ -525,16 +747,19 @@ def main():
         seg_start = tm["start"]
         seg_words = seg_word_ranges[i] if i < len(seg_word_ranges) else []
         shots = seg.get("shots") or [dict(seg, text=seg["text"])]
-        # Shot time ranges via word matching; fallback = even split.
+        # Shot time ranges via word matching (sequential: each shot
+        # matches at/after the previous shot's end); fallback = even split.
         ranges = []
         ok = True
+        search_from = 0
         for sh in shots:
             m = match_shot(sh.get("text", ""), seg_words, seg_start,
-                           tm["start"] + tm["duration"])
+                           tm["start"] + tm["duration"], start_idx=search_from)
             if m is None:
                 ok = False
                 break
-            ranges.append(m)
+            ranges.append((m[0], m[1]))
+            search_from = m[2]
         if not ok or not ranges:
             n = len(shots)
             total = tm["duration"] + CFG["tts"]["segment_gap_sec"]
@@ -553,9 +778,24 @@ def main():
             # A person shot must show the person; the publisher image is
             # often about a secondary subject. Hook segments use their own
             # shot spec for the same reason.
+            # Agent-verified pins outrank story-owned: if the research loop
+            # pinned a verified file for this shot's query, use it.
+            # Verified pins live in cache/verified/ — legacy blind
+            # downloads in cache/ never count as verified.
+            q = sh.get("broll") or "technology abstract"
+            pinned = None
+            for cand in (VCACHE / f"{slug(q)}.mp4", VCACHE / f"{slug(q)}.jpg"):
+                if cand.exists() and cand.stat().st_size >= 10_000:
+                    pinned = ("clip" if cand.suffix == ".mp4" else "photo",
+                              str(cand))
+                    break
             n = story_asset_n.get(sid, 0)
             assets = story_assets.get(sid, []) if sid else []
-            if (j == 0 and n < len(assets) and seg_kind == "story"
+            if pinned:
+                kind, path = pinned
+                source = "verified-pin"
+                print(f"[visuals] shot {idx}: verified pin -> {kind}")
+            elif (j == 0 and n < len(assets) and seg_kind == "story"
                     and not sh.get("person")):
                 story_asset_n[sid] = n + 1
                 kind, path = assets[n]
@@ -563,22 +803,72 @@ def main():
                 print(f"[visuals] shot {idx}: story-owned {kind} -> {kind}")
             else:
                 page_urls = sid_to_urls.get(sid, [])
+                prev_path = visuals[-1]["path"] if visuals else None
                 kind, path, source = fetch_visual(sh, dur, w, h,
                                                  script["title"], idx,
-                                                 page_urls)
+                                                 page_urls, prev_path)
             entry = {"idx": idx, "segment": i, "kind": kind,
                      "path": path, "duration": round(dur, 3),
                      "seg_kind": seg_kind, "start": round(s_time, 3),
                      "source": source,
-                     "person": bool(sh.get("person"))}
-            # Logo overlay: sentence names company + action -> composite.
-            logo_co = sh.get("logo_overlay")
-            if logo_co:
-                lp = fetch_logo(logo_co)
-                if lp:
-                    entry["logo"] = str(lp)
-                    print(f"[visuals] shot {idx}: +{logo_co} logo overlay")
+                     "person": bool(sh.get("person")),
+                     # Document-ish shots (articles, docs, tables, posts):
+                     # dense text must not be cropped by an aggressive
+                     # Ken Burns punch-in at render.
+                     "doc": kind == "photo" and any(
+                         k in (sh.get("broll") or "").lower()
+                         for k in ("article", "page", "website", "screenshot",
+                                   "document", "table", "chart", "post",
+                                   "announcement", "blog", "detector",
+                                   "interface", "pricing"))}
+            if entry["person"] and kind == "photo":
+                entry["face_xy"] = detect_face(path)
+                if entry["face_xy"]:
+                    print(f"[visuals] shot {idx}: face at {entry['face_xy']}")
+            # Logo overlay RETIRED 2026-10-09 (shot-grammar rule 12): the
+            # top-right corner now carries the story number badge, rendered
+            # by render.py. Company marks appear only as shot subjects.
+            # logo_overlay in old scripts is ignored.
+            if sh.get("logo_overlay"):
+                print(f"[visuals] shot {idx}: logo_overlay retired — "
+                      f"corner now shows the story number")
             visuals.append(entry)
+    # Speech-aligned cuts (2026-10-08): a new segment's visual must land
+    # exactly when its narration starts, not ~0.5s earlier inside the
+    # inter-segment pause (viewers read that as "the narrator is late").
+    # Move the pause onto the previous shot's tail: shift the boundary
+    # forward to the segment's first word, keeping total duration identical
+    # so A/V sync can't drift.
+    first_word_start = {}
+    for i in range(len(timings)):
+        sw = seg_word_ranges[i] if i < len(seg_word_ranges) else []
+        if sw:
+            first_word_start[i] = sw[0]["start"]
+    for k in range(1, len(visuals)):
+        if visuals[k]["segment"] == visuals[k - 1]["segment"]:
+            continue
+        fw = first_word_start.get(visuals[k]["segment"])
+        if fw and fw > visuals[k]["start"] + 0.05:
+            shift = round(fw - visuals[k]["start"], 3)
+            if visuals[k]["duration"] - shift >= 0.8:
+                visuals[k - 1]["duration"] = round(
+                    visuals[k - 1]["duration"] + shift, 3)
+                visuals[k]["start"] = round(fw, 3)
+                visuals[k]["duration"] = round(
+                    visuals[k]["duration"] - shift, 3)
+                print(f"[visuals] shot {visuals[k]['idx']}: cut aligned to "
+                      f"speech (+{shift:.2f}s)")
+    # A/V sync (2026-10-09): the visual timeline must equal the narration
+    # timeline. Shot durations used to span only [first_word, last_word],
+    # silently dropping every inter-shot pause from the video — the visuals
+    # ran ~4.5s ahead by the end ("shots transition before the texts
+    # finish") and the tail froze on a cloned frame. Extend each shot to
+    # the next shot's start so the pause belongs to the outgoing shot;
+    # cuts then land exactly when the next narration begins. (The last
+    # shot already fills to the narration end.)
+    for k in range(len(visuals) - 1):
+        visuals[k]["duration"] = round(
+            visuals[k + 1]["start"] - visuals[k]["start"], 3)
     (ROOT / "output" / "visuals.json").write_text(json.dumps(visuals, indent=2))
     print(f"[visuals] {len(visuals)} shots planned")
 
