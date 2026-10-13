@@ -1,81 +1,98 @@
 # AI News Video Pipeline
 
-Hands-off pipeline that turns AI news into a daily short-form video (TikTok / Reels / YouTube Shorts) and a weekly long-form video (YouTube). Everything runs on free infrastructure; every script is written so a high-schooler can follow the content.
+A pipeline that turns the day's AI news into a short-form video every morning. Five stories, about two minutes, rendered in a terminal aesthetic — neon green typewriter text on black — and delivered to a Telegram review queue.
 
-## The 3 big decisions
+## What it produces
 
-| Decision | Choice | Why |
-|---|---|---|
-| **Host** | GitHub Actions (public repo), scheduled workflows | More hands-off than a VM: no patching, no idle-reclamation, no credit card, unlimited Linux minutes on public repos. Fallback: Oracle Cloud Always Free (2 OCPU / 12 GB ARM, free forever) runs the same scripts unchanged if you ever want a real VM. |
-| **Video stack** | Kokoro TTS + faster-whisper karaoke captions + Pixabay b-roll + raw ffmpeg | $0, commercial-clean licenses (Apache-2.0 / MIT / LGPL + stock content licenses), runs on 2 vCPUs. A 60s short renders in ~5–10 min end-to-end. |
-| **Publishing** | Phase 1: Telegram review queue. Phase 2: YouTube Data API, then IG Reels, then TikTok | TikTok needs a 2–6 week content audit and IG needs Meta app review before auto-posting works. The Telegram queue ships day one with zero approvals and doubles as the safety net forever. |
+A daily 9:16 video (TikTok / Reels / Shorts format):
 
-## How it flows
+- **Cold open** — the date and the five stories, typed out letter-by-letter in a terminal intro with a red `BREAKING` kicker
+- **Headline hooks** — five rapid headline cuts, each pairing a verified photo of the story's key person with the company logo
+- **Deep dives** — each story gets 2–3 shots: real photos, article screenshots, or animated data graphics, with a persistent `#1`–`#5` story badge
+- **Captions** — per-letter typewriter captions synced to true TTS word timings, with a trailing block cursor
+
+Stories are ordered most-interesting-first. Narration is Kokoro TTS (`am_echo`, 1.10x). Every script is gated at Flesch-Kincaid grade ≤ 9.5.
+
+## How it works
 
 ```
-cron (daily 06:00 PT)                    cron (weekly, Sun 06:00 PT)
-  │                                        │
-  ▼                                        ▼
-SCOUT ──► CURATOR ──► EXPLAINER ──► SCRIPTWRITER ──► FACT-CHECKER ──► PRODUCER ──► QA GATE ──► PUBLISHER
-(fetch     (pick 1       (high-school     (hook-first      (veto power:      (TTS + captions    (duration,     (Telegram queue
- news,      story /        level rewrite,   short / chapters  claims must       + b-roll +        safe zones,   → you tap post;
- dedupe)    5–7 weekly)    grade ≤ 9)        long scripts)     match sources)    ffmpeg render)    captions)      YT API phase 2)
-                                                                                                              │
-                                                                                                              ▼
-                                                                                                           ANALYST (weekly:
-                                                                                                           views → topic scores
-                                                                                                           feed back to Curator)
+03:00 PT  X/news scan ──► x_curated.json
+03:45 PT  curate + write script (5 stories, deduped against state.json)
+             │
+             ▼
+          TTS ──► captions ──► visuals ──► render ──► QA gate ──► Telegram
+        (Kokoro)   (word-timed)  (verified)  (ffmpeg)   (blocking)
 ```
 
-Full role contracts and prompts: [`AGENT_GRAPH.md`](AGENT_GRAPH.md).
+The 03:45 run is an agent that acts as scout, curator, writer, and fact-checker — it picks the stories, writes the script, and eye-verifies every visual before the mechanical stages run. The VM executes only the deterministic stages: TTS, captions, visual assembly, render, QA, publish.
 
-## Cost
+**Visual sourcing policy:** every evidence shot is verified by eye before it ships. Named people get real photos, companies get real logos or buildings, documents get the actual article. No stock or Wikimedia Commons for evidence shots — stock is illustrative b-roll only. Anything unverifiable falls back to a screenshot of the specific source passage; a black frame is treated as a failed shot, never shipped as fine.
 
-$0/month. Optional: X API pay-per-use (~$1/mo at this volume) if you add X later. No credit card required for anything in Phase 1. If you ever use an aggregator to skip TikTok/IG audits, that's ~$20/mo (Metricool) — not needed to start.
+**Versioning:** every pipeline change bumps `pipeline/VERSION` and gets a `CHANGELOG.md` entry. Each render stamps its pipeline version into `qa.json`, so any video can be traced to the exact code that built it.
 
-## Setup (one-time, ~1 hour)
+## Setup
 
-1. Create a **public** GitHub repo, push this folder. (Private also works: 2,000 min/mo free, this workload uses ~900–1,400.)
-2. Add repo secrets (Settings → Secrets → Actions):
-   - `GEMINI_API_KEY` — free tier at Google AI Studio, drives Curator/Explainer/Scriptwriter/Fact-checker
-   - `PIXABAY_API_KEY` — free at pixabay.com/api (Pexels paused new keys as of Oct 2026, so Pixabay is the primary b-roll source)
-   - `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` — BotFather + your chat; this is the review queue and failure alerts
-   - Phase 2 only: `YOUTUBE_CLIENT_SECRETS` (OAuth client JSON, base64)
-3. Drop 2–3 royalty-free music tracks (Pixabay Music / Mixkit) into `pipeline/assets/music/`.
-4. Run "daily-short" manually once from the Actions tab (workflow_dispatch) to verify.
+**Requirements:** Python 3.12, ffmpeg, ~8 GB RAM. The daily run currently executes on a VM (see `run_vm.sh`); GitHub Actions workflows are kept as fallback with their schedules disabled.
 
-After that: daily short renders ~06:00 PT and lands in your Telegram. Weekly long-form renders Sunday 06:00 PT. Failure alerts go to the same Telegram chat.
+1. Clone the repo and create a Python 3.12 venv:
+   ```
+   python3.12 -m venv .venv && .venv/bin/pip install -r pipeline/requirements.txt
+   .venv/bin/pip install -r pipeline/requirements-vm.txt   # VM-only pins
+   ```
+2. Copy your secrets into `.env` (never committed — it's in `.gitignore`):
+   ```
+   PIXABAY_API_KEY=...        # illustrative b-roll only
+   TELEGRAM_BOT_TOKEN=...     # review queue + failure alerts
+   TELEGRAM_CHAT_ID=...
+   ```
+3. Run the mechanical stages:
+   ```
+   ./run_vm.sh daily
+   ```
+   This runs TTS → captions → visuals → render → QA → publish. The QA gate blocks publishing on any failure.
 
-## Repo layout
+For the full scheduled flow (scan + agent curation + render), see the runbook in `pipeline/` — the 03:00/03:45 crons orchestrate it.
+
+## Configuration
+
+All knobs live in `pipeline/config.yaml`: TTS voice/speed, caption style, shot geometry, QA thresholds. Story state (dedupe) lives in `pipeline/state.json`.
+
+## Project structure
 
 ```
 pipeline/
-  config.yaml        # all knobs: voices, formats, word counts, thresholds
-  run.py             # orchestrator: runs every stage in order, alerts on failure
-  ingest.py          # Scout: Google News RSS + override file, dedupe → stories.json
-  write.py           # Curator + Explainer + Scriptwriter + Fact-checker (Gemini)
-  tts.py             # Producer (audio): Kokoro TTS per segment → narration_full.wav
-  captions.py        # Producer (captions): faster-whisper → karaoke .ass
-  visuals.py         # Producer (visuals): Pixabay b-roll cache, title-card fallback
-  render.py          # Producer (render): two-pass ffmpeg → final mp4
-  qa.py              # QA gate: duration, resolution, caption sanity, grade-level check
-  publish.py         # Publisher: Telegram review queue (+ YouTube API, phase 2)
-  state.json         # seen/posted story ids — committed back each run (also defeats
-                     # GitHub's 60-day schedule auto-disable)
-  output/            # mp4s, scripts, captions per run (uploaded as Actions artifacts)
-  cache/clips/       # downloaded b-roll, keyed by keyword (persist via actions/cache)
-  assets/music/      # your royalty-free tracks
+  run.py            # orchestrator: stages in order, alerts on failure
+  ingest.py         # news fetching + dedupe
+  tts.py            # Kokoro TTS with true word timings + fingerprint cache
+  captions.py       # per-letter typewriter captions
+  visuals.py        # visual sourcing: verified pins → story media → screenshots
+  analytics.py      # terminal-style animated data graphics
+  render.py         # two-pass ffmpeg render
+  qa.py             # blocking QA gate
+  publish.py        # Telegram review queue
+  selfplug.py       # character-emotion montage from the intro portrait
+  config.yaml       # all tunables
+  VERSION           # current pipeline version
+  CHANGELOG.md      # version history
 .github/workflows/
-  daily.yml          # 06:00 PT daily short
-  weekly.yml         # Sunday 06:00 PT long-form
+  daily.yml         # fallback: daily short via Actions (schedule disabled)
+  weekly.yml        # fallback: weekly long-form via Actions (schedule disabled)
 ```
 
-## Notes & gotchas
+## Roadmap
 
-- **One 1080×1920 master** covers TikTok, Reels, and Shorts — no per-platform re-render.
-- **Captions go in the middle third** (Alignment 5), never the bottom: platform UI covers the bottom ~20–35%.
-- **Commercial-clean only**: Kokoro (Apache-2.0), faster-whisper (MIT), ffmpeg (LGPL), Pixabay content license. Do not swap in Coqui XTTS (non-commercial) or edge-tts (ToS gray zone) on a monetized channel.
-- **Whisper jargon**: AI news is full of model names; `base.en` minimum, `--language en` forced, initial prompt seeded with expected terms.
-- **GitHub schedule delays**: cron runs can slip 10–30 min at peak; harmless here.
-- **YouTube uploads via API start as private** until your OAuth app passes Google verification — by design, use the Telegram queue until then.
-- **TikTok audit / IG app review** are the only human-speed gates in the whole system; everything else is same-day.
+**Phase 1 — Daily shorts (live).** The current system: scan, write, render, QA, Telegram delivery every morning.
+
+**Phase 2 — TikTok publishing.** Browser automation on tiktok.com/upload (the official API can't attach sounds). Flow: pipeline drafts the post (video + description + hashtags + rotated saved song) → Telegram "Approve & Post" → posts only on approval. Pending: one-time login and the saved-songs list.
+
+**Phase 3 — Weekly long-form.** A 16:9 weekly digest for YouTube. Deferred until the daily format is locked.
+
+**Phase 4 — Native publishing.** YouTube Data API and Instagram Graph API once their reviews/audits clear, replacing the manual Telegram step.
+
+**Phase 5 — Feedback loop.** View and retention analytics feeding back into story selection — topics that hold attention get weighted up in curation.
+
+**Open questions:** background music (currently no music by design — the terminal aesthetic carries it); multi-language narration.
+
+## License notes
+
+The stack is commercial-clean: Kokoro (Apache-2.0), faster-whisper (MIT), ffmpeg (LGPL), Pixabay content license for b-roll. Keep it that way — don't swap in non-commercial TTS models on a monetized channel.
