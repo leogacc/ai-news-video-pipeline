@@ -1,0 +1,12 @@
+# VM-branch pins. Install AFTER pipeline/requirements.txt:
+#   .venv/bin/pip install -r pipeline/requirements-vm.txt
+# av 17+ removed the `metadata_errors` kwarg from av.open(), which
+# faster-whisper 1.2.1 still passes (captions.py crashes with TypeError).
+# 16.1.0 is the newest av that keeps it. Do NOT add this pin to the shared
+# requirements.txt — GitHub Actions resolves its own working combo.
+av==16.1.0
+
+# Face detection for dynamic overlay placement (YuNet DNN).
+# Pillow is used to auto-whiten dark logo overlays.
+opencv-python-headless
+Pillow
