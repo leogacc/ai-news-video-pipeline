@@ -67,24 +67,25 @@ def _build_hook_pairs(script, mode="daily"):
         if lspec:
             lp = ROOT / "cache" / "verified" / lspec
             if lp.exists():
-                logo = Image.open(lp)
-                if logo.mode == "RGBA":
-                    bg = Image.new("RGB", logo.size, (0, 0, 0))
-                    bg.paste(logo, mask=logo.split()[3])
-                    logo = bg
-                else:
-                    logo = logo.convert("RGB")
-                # 2026-10-12: invert dark marks — a black logo on the
-                # pair's black background would be invisible. Sample only
-                # the opaque mark pixels, not the black background.
+                # 2026-10-13b ROOT CAUSE: invert BEFORE compositing.
+                # The old order composited onto black first, then inverted
+                # the whole thing — turning the black background WHITE.
+                # (That shipped a gray-on-white Lancet pair.) Invert the
+                # RGBA's colors while keeping its alpha, then composite.
                 _rgba = Image.open(lp).convert("RGBA")
                 _a = _rgba.split()[3]
                 _lum = _rgba.convert("L")
                 _mark = [l for l, a in zip(_lum.getdata(), _a.getdata())
                          if a > 10]
                 if _mark and sum(_mark) / len(_mark) < 80:
+                    # Dark mark: invert colors, keep alpha (2026-10-13:
+                    # normalize to 85% white — raw inversions glare).
                     from PIL import ImageOps
-                    logo = ImageOps.invert(logo)
+                    _inv = ImageOps.invert(_rgba.convert("RGB")).point(
+                        lambda q: int(q * 0.85))
+                    _rgba = Image.merge("RGBA", (*_inv.split(), _a))
+                _bg = Image.new("RGBA", _rgba.size, (0, 0, 0, 255))
+                logo = Image.alpha_composite(_bg, _rgba).convert("RGB")
                 r2 = 112 / logo.height
                 logo = logo.resize((min(int(logo.width * r2), 400), 112),
                                    Image.LANCZOS)
