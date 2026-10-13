@@ -4,6 +4,24 @@ Every pipeline upgrade bumps `VERSION` and adds an entry here, newest first.
 The version is stamped into every render's `qa.json` (`pipeline_version`)
 so any video can be traced to the exact code that built it.
 
+## 2026.10.13.2 — 2026-10-13
+- Landscape hooks get captions (user): headline hooks and branding now
+  use the split layout (terminal panel | visual) like story deep-dives —
+  the panel types the hook narration, so no segment lacks on-screen text.
+  Only the cold-open intro stays full-frame (it types its own).
+- Logo inversion root-cause fix (user: "lancet logo is too white"):
+  _build_hook_pairs inverted the COMPOSITED image (dark text on black
+  background), turning the background white — shipped a gray-on-white
+  Lancet pair. Now inverts the RGBA colors while keeping alpha, then
+  composites onto black. Inverted marks normalized to 85% white in both
+  the pair builder and _load_intro_logo (raw inversions glare against
+  native white logos). Standing rule: prefer white logo artwork, always
+  on black.
+- Hook wordmarks capped at 900px in the visual region (logo-only pairs
+  sprawled across the full region width).
+- Fixed unlabeled filtergraph output crash on badgeless splits (added
+  explicit -map [stack]).
+
 ## 2026.10.13.1 — 2026-10-13
 - Landscape mode (user): new 16:9 `landscape` config mode (1920x1080) and
   render path, developed on the `landscape-layout` branch. Story
