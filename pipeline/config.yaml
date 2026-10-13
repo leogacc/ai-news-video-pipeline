@@ -19,6 +19,15 @@ weekly:
   crf: 22
   preset: veryfast
 
+landscape:
+  stories: 5
+  script_words: [200, 350]
+  width: 1920
+  height: 1080
+  fps: 30
+  crf: 21
+  preset: veryfast
+
 tts:
   voice: am_echo         # Kokoro fixed voice — keep constant for channel identity (user 2026-10-12: was af_sarah)
   lang_code: a
