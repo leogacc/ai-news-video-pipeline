@@ -20,10 +20,10 @@ weekly:
   preset: veryfast
 
 tts:
-  voice: af_sarah        # Kokoro fixed voice — keep constant for channel identity
+  voice: am_echo         # Kokoro fixed voice — keep constant for channel identity (user 2026-10-12: was af_sarah)
   lang_code: a
   sample_rate: 24000
-  speed: 1.0            # natural voice; pacing comes from comma-heavy scripting
+  speed: 1.10           # user 2026-10-11: settled from pace samples (was 1.25)
   segment_gap_sec: 0.2
 
 captions:
