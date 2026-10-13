@@ -122,7 +122,7 @@ def _guard_logo(rgb, p):
     return rgb
 
 
-def frame_layout(src, W, H, out_path):
+def frame_layout(src, W, H, out_path, landscape=False):
     """Terminal-era still layout (2026-10-09, rev 2026-10-09b).
 
     The frame background is ALWAYS black. Every still is fit *inside* the
@@ -134,10 +134,21 @@ def frame_layout(src, W, H, out_path):
     """
     # 2026-10-11b: stills centered at frame vertical middle (y=960),
     # not bottom-aligned — bottom-align pushed deep-dive shots off-center.
-    TOP_PAD, REGION_BOTTOM = int(200 * H / 1920), int(1420 * H / 1920)
     im = Image.open(src).convert("RGB")
     iw, ih = im.size
     canvas = Image.new("RGB", (W, H), (0, 0, 0))
+    if landscape:
+        # Landscape (2026-10-13): fit inside the whole W x H region,
+        # centered — no caption zone to protect, the terminal panel owns
+        # the text. (The 9:16 math below assumes a 1080x1920 frame and
+        # would crush landscape visuals into a y 112..796 band.)
+        s = min(W / iw, H / ih)
+        fg = im.resize((max(1, int(iw * s)), max(1, int(ih * s))),
+                       Image.LANCZOS)
+        canvas.paste(fg, ((W - fg.width) // 2, (H - fg.height) // 2))
+        canvas.save(out_path, quality=92)
+        return str(out_path)
+    TOP_PAD, REGION_BOTTOM = int(200 * H / 1920), int(1420 * H / 1920)
     rw, rh = W, REGION_BOTTOM - TOP_PAD
     s = min(rw / iw, rh / ih)
     fg = im.resize((max(1, int(iw * s)), max(1, int(ih * s))),
@@ -156,6 +167,15 @@ def main():
     mode = sys.argv[sys.argv.index("--mode") + 1] if "--mode" in sys.argv else "daily"
     w, h, fps = CFG[mode]["width"], CFG[mode]["height"], CFG[mode]["fps"]
     preset, crf = CFG[mode]["preset"], CFG[mode]["crf"]
+    # Landscape mode (2026-10-13): 16:9 variant of the pipeline. Story
+    # deep-dives split the frame — left third is a live terminal panel
+    # typing the narration (this IS the caption track in landscape),
+    # right two-thirds plays the visual. Intro/hooks/branding stay
+    # full-frame. The 9:16 path below is untouched by LANDSCAPE branches.
+    LANDSCAPE = (mode == "landscape")
+    PANEL_W = 640 if LANDSCAPE else 0   # terminal panel width (left third)
+    VIS_X = 640 if LANDSCAPE else 0     # visual region left edge
+    VIS_W = (w - VIS_X) if LANDSCAPE else w  # visual region width
 
     visuals = json.loads((ROOT / "output" / "visuals.json").read_text())
     seg_dir = ROOT / "output" / "segments"
@@ -212,15 +232,25 @@ def main():
     # PERSON_H (2026-10-11): intro hook visuals are real photos of each
     # story's key person (not company logos) — faces need height to read,
     # so person photos display larger than logos did.
-    PERSON_H = 240
+    PERSON_H = 200 if LANDSCAPE else 240
     # LOGO_Y is DYNAMIC (2026-10-10): logos sit above the people photo with
     # a small gap — computed in intro_video from PEOPLE_IMG_Y.
     LOGO_GAP_ABOVE_PHOTO = 30
-    PEOPLE_IMG_Y = 600   # top of the intro people portrait
-    PEOPLE_IMG_W = 950   # fitted width (aspect kept)
-    INTRO_TEXT_Y = 1450  # intro text top (aligned to caption zone)
-    INTRO_FSIZE = 48     # intro text size (scaled down 2026-10-10)
-    INTRO_LX = 60        # intro text left x (matches ASS captions)
+    if LANDSCAPE:
+        # Landscape intro geometry (2026-10-13): the people row, portrait,
+        # and text stack to fit 1080px — portrait is 3:2 so it can't
+        # dominate like in 9:16.
+        PEOPLE_IMG_Y = 270   # top of the intro people portrait
+        PEOPLE_IMG_W = 800   # fitted width (aspect kept, 3:2 -> 533 tall)
+        INTRO_TEXT_Y = 840   # intro text top (clear of the portrait)
+        INTRO_FSIZE = 54     # intro text size
+        INTRO_LX = 80        # intro text left x
+    else:
+        PEOPLE_IMG_Y = 600   # top of the intro people portrait
+        PEOPLE_IMG_W = 950   # fitted width (aspect kept)
+        INTRO_TEXT_Y = 1450  # intro text top (aligned to caption zone)
+        INTRO_FSIZE = 48     # intro text size (scaled down 2026-10-10)
+        INTRO_LX = 60        # intro text left x (matches ASS captions)
 
     def draw_glyph(name):
         from PIL import Image, ImageDraw
@@ -589,6 +619,121 @@ def main():
               f"{n_frames} frames, {len(logo_positions)} logos)")
         return str(dest)
 
+    def terminal_panel(seg_idx, dest):
+        """Landscape-only (2026-10-13): the left-third terminal panel.
+        The segment's narration types itself word-by-word in glowing
+        green mono, synced to the TTS word timestamps — this IS the
+        caption track in landscape, so no ASS captions are burned.
+        One panel clip is rendered per story segment; shots slice their
+        time range out of it, keeping typing in sync automatically."""
+        from PIL import Image, ImageDraw, ImageFont
+        PW, PH = PANEL_W, h
+        GREEN = (57, 255, 20)
+        GLOW = (0, 100, 8)
+        try:
+            f_body = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+                26)
+            f_head = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+                30)
+        except Exception:
+            f_body = f_head = ImageFont.load_default()
+        tm = timings[seg_idx]
+        seg_start, seg_dur = tm["start"], tm["duration"]
+        seg = script["segments"][seg_idx]
+        n = story_num.get(str(seg.get("story_id") or "")) or 0
+        sid = str(seg.get("story_id") or "").upper()
+        header = f"> #{n} {sid}" if n else "> DIGEST"
+        seg_words = [ww for ww in words
+                     if seg_start - 0.05 <= ww["start"] < seg_start + seg_dur]
+        # Word-wrap once — layout never reflows between frames.
+        # (2026-10-13 fix: the leading space of each word must be part of
+        # its x position — the first version measured the space for
+        # wrapping but dropped it when drawing, jamming words together.)
+        meas = ImageDraw.Draw(Image.new("RGB", (PW, PH)))
+        maxw = PW - 80
+        lines, wstarts = [], []
+        cur, x = [], 40
+        for wd in seg_words:
+            tok = wd["word"]
+            tw = meas.textlength(tok, font=f_body)
+            sw = meas.textlength(" ", font=f_body) if cur else 0
+            if cur and (x + sw + tw - 40) > maxw:
+                lines.append(cur)
+                cur, x, sw = [], 40, 0
+            x += sw
+            wstarts.append((len(lines), x))
+            cur.append(tok)
+            x += tw
+        if cur:
+            lines.append(cur)
+        lh, body_y = 38, 140
+        wtimes = [ww["start"] - seg_start for ww in seg_words]
+
+        def _glow_text(d, xy, s, font):
+            x, y = xy
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                d.text((x + dx, y + dy), s, font=font, fill=GLOW)
+            d.text((x, y), s, font=font, fill=GREEN)
+
+        def frame_at(t):
+            img = Image.new("RGB", (PW, PH), (0, 0, 0))
+            d = ImageDraw.Draw(img)
+            _glow_text(d, (40, 44), header, f_head)
+            d.line([(40, 104), (PW - 40, 104)], fill=(0, 80, 6), width=2)
+            last_vis = -1
+            for wi, wt in enumerate(wtimes):
+                if wt <= t:
+                    last_vis = wi
+                else:
+                    break
+            for wi in range(last_vis + 1):
+                li, x = wstarts[wi]
+                _glow_text(d, (x, body_y + li * lh),
+                           seg_words[wi]["word"], f_body)
+            if last_vis >= 0:
+                li, x = wstarts[last_vis]
+                tw = meas.textlength(seg_words[last_vis]["word"] + " ",
+                                     font=f_body)
+                cx, cy = x + tw, body_y + li * lh
+                if t % 1.0 < 0.6:  # blinking block cursor
+                    d.rectangle([cx, cy, cx + 15, cy + 30], fill=GREEN)
+            # Right-edge separator: thin green rule between panel/visual.
+            d.line([(PW - 2, 0), (PW - 2, PH)], fill=(0, 120, 8), width=3)
+            return img
+
+        n_frames = max(1, int(seg_dur * fps))
+        frame_dur = seg_dur / n_frames
+        fdir = seg_dir / f"panel_frames_{seg_idx:02d}"
+        fdir.mkdir(exist_ok=True)
+        for p in fdir.glob("f*.png"):
+            p.unlink()
+        lst = fdir / "frames.txt"
+        with open(lst, "w") as fh:
+            fh.write("ffconcat version 1.0\n")
+            for k in range(n_frames):
+                fp = fdir / f"f{k:04d}.png"
+                frame_at(k * frame_dur).save(fp)
+                fh.write(f"file '{fp}'\nduration {frame_dur:.4f}\n")
+            fh.write(f"file '{fdir / f'f{n_frames-1:04d}.png'}'\n")
+        run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+             "-vf", "format=yuv420p",
+             "-r", str(fps), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+             "-preset", "veryfast", "-crf", "18", str(dest)])
+        print(f"[render] terminal panel seg {seg_idx} "
+              f"({dest.name}, {n_frames} frames, {len(seg_words)} words)")
+        return str(dest)
+
+    _script_mtime = (ROOT / "output" / "script.json").stat().st_mtime
+
+    def _fresh(path):
+        """True if a generated clip is newer than script.json — safe to
+        reuse across re-runs (2026-10-13: the VM gets replaced mid-render,
+        so re-runs must not redo the expensive PIL frame generation)."""
+        p = Path(path)
+        return p.exists() and p.stat().st_mtime > _script_mtime
+
     def youtube_card(dest):
         """Branding-hook card (2026-10-09, rev 2026-10-09b): the YouTube
         logo as the visual for the 'link in bio' section — official red
@@ -626,6 +771,194 @@ def main():
         print(f"[render] youtube card generated ({dest.name})")
         return str(dest)
 
+    # Landscape: pre-render one terminal panel clip per story segment.
+    # Shots slice their time range out of it (typing stays in sync).
+    panel_clips = {}
+    if LANDSCAPE:
+        for si, _seg in enumerate(script["segments"]):
+            if _seg.get("kind") == "story" and _seg.get("story_id"):
+                dest = seg_dir / f"panel_seg{si:02d}.mp4"
+                if _fresh(dest):
+                    print(f"[render] terminal panel seg {si}: reusing "
+                          f"{dest.name}")
+                else:
+                    terminal_panel(si, dest)
+                panel_clips[si] = str(dest)
+
+    def render_landscape_shot(v, i, dur, seg, n, badge):
+        """Landscape (16:9) shot builder (2026-10-13). Layout per kind:
+        - cold-open intro: full-frame wide terminal intro (intro_video
+          already adapts via the landscape constants).
+        - headline hooks: full-frame side-by-side person+logo pair.
+        - story deep-dives: SPLIT — terminal panel (left third, sliced
+          from the pre-rendered segment panel so typing stays in sync)
+          + visual (right two-thirds).
+        - branding: full-frame self-plug clip, pillarboxed.
+        Story shots carry the number badge top-right of the visual region.
+        Two-up: a shot with two_up/path2 renders both visuals side by
+        side inside the visual region (data contract for the worker:
+        mark the script shot "two_up": true with a "broll2" query;
+        visuals.py resolves it to path2).
+        """
+        out = seg_dir / f"shot_{i:02d}.mp4"
+        is_intro = (v.get("segment") == 0 and v.get("seg_kind") == "hook")
+        is_branding = (v.get("seg_kind") == "hook"
+                       and not seg.get("story_id")
+                       and v.get("segment") != 0)
+        _analytics_map = {
+            17: "analytics_broadcom_outlook.mp4",
+        }
+        if i in _analytics_map:
+            ap = ROOT / "cache" / "generated" / _analytics_map[i]
+            if ap.exists():
+                v = dict(v, kind="clip", path=str(ap))
+                print(f"[render] shot {i}: analytical animation "
+                      f"({_analytics_map[i]})")
+        if is_intro:
+            anim = seg_dir / "intro_anim.mp4"
+            if not _fresh(anim):
+                seg0_end = timings[0]["start"] + timings[0]["duration"]
+                iw = [ww for ww in words if ww["start"] < seg0_end]
+                intro_video(script["segments"][0]["text"], iw, dur, anim,
+                            load_story_people())
+                print(f"[render] shot {i}: animated intro ({len(iw)} words)")
+            else:
+                print(f"[render] shot {i}: reusing intro_anim.mp4")
+            v = dict(v, kind="clip", path=str(anim))
+
+        def build_vis(path, is_clip, dest, vw, vh):
+            """Encode one visual-region clip (vw x vh). Photos get the
+            quick elastic zoom-out; clips play once and hold (no-loop)."""
+            if is_clip:
+                vf = (f"format=rgb24,"
+                      f"scale={vw}:{vh}:force_original_aspect_ratio=decrease,"
+                      f"pad={vw}:{vh}:(ow-iw)/2:(oh-ih)/2:0x000000,"
+                      f"fps={fps},setsar=1")
+                _no_loop = ("analytics_" in path or "selfplug_" in path)
+                if _no_loop:
+                    try:
+                        cp = subprocess.run(
+                            ["ffprobe", "-v", "quiet", "-show_entries",
+                             "format=duration", "-of", "csv=p=0", path],
+                            capture_output=True, text=True, check=True)
+                        c_dur = float(cp.stdout.strip())
+                    except Exception:
+                        c_dur = dur
+                    if dur - c_dur > 0.02:
+                        vf += (f",tpad=stop_mode=clone:"
+                               f"stop_duration={dur - c_dur:.3f}")
+                    base = ["-i", path]
+                else:
+                    base = ["-stream_loop", "-1", "-i", path]
+                run(["ffmpeg", "-y"] + base + ["-t", f"{dur:.2f}", "-vf", vf, "-an",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-colorspace", "bt709", "-color_primaries",
+                            "bt709", "-color_trc", "bt709",
+                            "-color_range", "tv",
+                            "-preset", preset, "-crf", "23", str(dest)])
+            else:
+                src = frame_layout(path, vw * 2, vh * 2,
+                                   seg_dir / f"shot_{i:02d}_bg.jpg",
+                                   landscape=True)
+                frames = max(1, int(dur * fps))
+                zmax = 1.05 if v.get("doc") else 1.12
+                zf = min(frames, int(1.5 * fps))
+                z = (f"if(lt(on,{zf}),"
+                     f"1+{zmax - 1:.3f}*pow(1-on/{zf},2)"
+                     f"*(1+0.45*sin(6.283*on/{zf})*(1-on/{zf}))"
+                     f",1)")
+                vf = (f"scale={vw*2}:{vh*2}:force_original_aspect_ratio=increase,"
+                      f"crop={vw*2}:{vh*2},"
+                      f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
+                      f"y='ih/2-(ih/zoom/2)':d=1:s={vw}x{vh}:fps={fps},"
+                      f"setsar=1")
+                run(["ffmpeg", "-y", "-loop", "1", "-framerate", str(fps),
+                     "-i", src, "-t", f"{dur:.2f}", "-vf", vf, "-an",
+                     "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                     "-colorspace", "bt709", "-color_primaries", "bt709",
+                     "-color_trc", "bt709", "-color_range", "tv",
+                     "-preset", preset, "-crf", "23", str(dest)])
+            return str(dest)
+
+        if v.get("seg_kind") == "story" and v.get("segment") in panel_clips:
+            # SPLIT: panel | visual.
+            vis = seg_dir / f"shot_{i:02d}_vis.mp4"
+            if v.get("two_up") and v.get("path2"):
+                # Two visuals side by side inside the visual region.
+                half = VIS_W // 2
+                l = build_vis(v["path"], v["kind"] == "clip",
+                              seg_dir / f"shot_{i:02d}_visL.mp4", half, h)
+                r = build_vis(v["path2"], v["kind"] == "clip",
+                              seg_dir / f"shot_{i:02d}_visR.mp4", half, h)
+                run(["ffmpeg", "-y", "-i", l, "-i", r,
+                     "-filter_complex", "[0:v][1:v]hstack=inputs=2",
+                     "-t", f"{dur:.2f}", "-an", "-c:v", "libx264",
+                     "-pix_fmt", "yuv420p", "-preset", preset, "-crf", "23",
+                     str(vis)])
+                print(f"[render] shot {i}: two-up visual")
+            else:
+                build_vis(v["path"], v["kind"] == "clip", vis, VIS_W, h)
+            tm = timings[v["segment"]]
+            rel = max(0.0, v["start"] - tm["start"])
+            fc = (f"[0:v]trim=start={rel:.3f}:end={rel + dur:.3f},"
+                  f"setpts=PTS-STARTPTS[p];[p][1:v]hstack=inputs=2[stack]")
+            inputs = ["-i", panel_clips[v["segment"]], "-i", str(vis)]
+            if badge:
+                # Badge top-right of the visual region (right edge at
+                # frame right, clear of the end-screen zone).
+                fc += f";[stack][2:v]overlay={w-336}:80"
+                inputs += ["-loop", "1", "-i", badge]
+            run(["ffmpeg", "-y", *inputs,
+                 "-filter_complex", fc,
+                 "-t", f"{dur:.2f}", "-an",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                 "-colorspace", "bt709", "-color_primaries", "bt709",
+                 "-color_trc", "bt709", "-color_range", "tv",
+                 "-preset", preset, "-crf", "23", str(out)])
+            print(f"[render] shot {i}: split panel|visual "
+                  f"(badge {n})" if badge else f"[render] shot {i}: split")
+            return str(out)
+
+        # Full-frame kinds: intro, hooks, branding.
+        if is_branding:
+            clip = ROOT / "cache" / "generated" / "selfplug_pixar.mp4"
+            if not clip.exists():
+                raise FileNotFoundError(
+                    f"[render] FATAL: self-plug clip missing: {clip}")
+            v = dict(v, kind="clip", path=str(clip))
+            print(f"[render] shot {i}: self-plug PIXAR clip ({clip.name})")
+        if v["kind"] == "clip" and is_intro:
+            vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+                  f"crop={w}:{h},fps={fps},setsar=1")
+            vf += ",fade=t=in:st=0:d=0.8"
+            run(["ffmpeg", "-y", "-i", v["path"], "-t", f"{dur:.2f}",
+                 "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                 "-preset", preset, "-crf", "23", str(out)])
+        elif v["kind"] == "clip":
+            build_vis(v["path"], True, out, w, h)
+        else:
+            # Hook pair photo, side-by-side person+logo (2026-10-13): the
+            # pair PNG is small — fitting it to the frame leaves it tiny
+            # (first landscape render). Scale it up to a strong display
+            # size (person ~560px tall) and center it on 1920x1080 black
+            # before the elastic zoom-out.
+            from PIL import Image as _Im
+            _pair = _Im.open(v["path"]).convert("RGB")
+            _s = 560 / _pair.height
+            _nw, _nh = int(_pair.width * _s), 560
+            if _nw > 1500:
+                _s = 1500 / _pair.width
+                _nw, _nh = 1500, int(_pair.height * _s)
+            _pair = _pair.resize((_nw, _nh), _Im.LANCZOS)
+            _canvas = _Im.new("RGB", (w, h), (0, 0, 0))
+            _canvas.paste(_pair, ((w - _nw) // 2, (h - _nh) // 2))
+            _bg = seg_dir / f"shot_{i:02d}_bg.jpg"
+            _canvas.save(_bg)
+            print(f"[render] shot {i}: hook pair upscaled to "
+                  f"{_nw}x{_nh}, centered")
+            build_vis(str(_bg), False, out, w, h)
+        return str(out)
+
     seg_files = []
     # Shot-region geometry (2026-10-11b): visuals centered at frame
     # vertical middle (y=960). Was bottom-aligned at y 1420 (pushed
@@ -636,12 +969,28 @@ def main():
     for v in visuals:
         i, dur = v["idx"], v["duration"]
         out = seg_dir / f"shot_{i:02d}.mp4"
+        seg = script["segments"][v["segment"]] \
+            if v.get("segment", 0) < len(script["segments"]) else {}
+        if LANDSCAPE:
+            # Landscape path (2026-10-13): split terminal panel + visual.
+            # The 9:16 code below is untouched.
+            badge = None
+            n = None
+            if v.get("seg_kind") == "story":
+                n = seg_number(v.get("segment"))
+                if n:
+                    badge = seg_dir / f"badge_{n}.png"
+                    if not badge.exists():
+                        number_badge(n, badge)
+                    badge = str(badge)
+            render_landscape_shot(v, i, dur, seg, n, badge)
+            _prev_badge_n = n if badge else None
+            seg_files.append(out)
+            continue
         # Intro (2026-10-09): the cold-open hook gets a full-screen title
         # card in huge type instead of b-roll — its text IS the visual.
         # Branding hook ("link in bio"): the YouTube logo as its visual.
         is_intro = (v.get("segment") == 0 and v.get("seg_kind") == "hook")
-        seg = script["segments"][v["segment"]] \
-            if v.get("segment", 0) < len(script["segments"]) else {}
         is_branding = (v.get("seg_kind") == "hook"
                        and not seg.get("story_id")
                        and v.get("segment") != 0)
@@ -875,15 +1224,22 @@ def main():
     if pad > 0.02:
         vf_parts.append(f"tpad=stop_mode=clone:stop_duration={pad:.3f}")
         print(f"[render] padding video {pad:.2f}s to narration length")
-    # Emphasis pills: 2-4 word punch labels, white bold text on a black box,
-    # centered mid-frame (never fights the terminal captions below).
-    vf_parts.append(f"ass={captions}")
-    # Watermark (2026-10-10): "@leos.logos" at 50%, positioned above logos
-    # (y=190), left-aligned with text.
-    vf_parts.append(
-        "drawtext=text='@leos.logos':fontfile=/usr/share/fonts/truetype/"
-        "dejavu/DejaVuSans-Bold.ttf:x=60:y=190:fontsize=34:"
-        "fontcolor=white@0.5")
+    # Landscape (2026-10-13): the terminal panel IS the caption track —
+    # no ASS captions are burned.
+    if not LANDSCAPE:
+        vf_parts.append(f"ass={captions}")
+    # Watermark (2026-10-10): "@leos.logos" at 50%. Landscape: top-left
+    # of the visual region, aligned with the badge top (y=80).
+    if LANDSCAPE:
+        vf_parts.append(
+            "drawtext=text='@leos.logos':fontfile=/usr/share/fonts/truetype/"
+            f"dejavu/DejaVuSans-Bold.ttf:x={VIS_X + 40}:y=80:fontsize=34:"
+            "fontcolor=white@0.5")
+    else:
+        vf_parts.append(
+            "drawtext=text='@leos.logos':fontfile=/usr/share/fonts/truetype/"
+            "dejavu/DejaVuSans-Bold.ttf:x=60:y=190:fontsize=34:"
+            "fontcolor=white@0.5")
     # Emphasis pills as ASS events (not drawtext): they fade in right before
     # the emphasized words are spoken, and sit away from faces.
     # (script.json, words.json, timings.json already loaded at top of main
@@ -919,10 +1275,10 @@ def main():
                 return sw["start"], sw["end"]
         return None
 
-    emph_header = """[Script Info]
+    emph_header = f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+PlayResX: {1920 if LANDSCAPE else 1080}
+PlayResY: {1080 if LANDSCAPE else 1920}
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
@@ -936,21 +1292,37 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     emph_events = []
     # Overlay geometry sidecar for QA safe-area checks (2026-10-11,
     # motion-skills audit): every burned-in overlay's rect/anchor, so qa.py
-    # can verify nothing sits under TikTok's UI zones. Single source of
+    # can verify nothing sits under platform UI zones. Single source of
     # truth — these are the same constants used to place the overlays.
-    overlay_geoms = [
-        {"name": "story_badge", "rect": [w - 396, 146, w - 396 + 276, 278]},
-        {"name": "watermark", "rect": [60, 190, 300, 228]},
-        {"name": "hook_num_pill",
-         # single 132pt digit centered on the badge (badge center x =
-         # w-396+138 = w-258): ~80px wide, ~140px tall
-         "rect": [w - 258 - 40, 212 - 70, w - 258 + 40, 212 + 70]},
-        {"name": "captions", "anchor": [60, 1450]},
-    ]
+    if LANDSCAPE:
+        # Landscape (2026-10-13): badge top-right of the visual region,
+        # watermark top-left of the visual region, hook pill centered on
+        # the badge. No captions/emphasis anchors — the terminal panel is
+        # layout, not an overlay.
+        overlay_geoms = [
+            {"name": "story_badge",
+             "rect": [w - 336, 80, w - 336 + 276, 80 + 132]},
+            {"name": "watermark", "rect": [VIS_X + 40, 80, VIS_X + 280, 118]},
+            {"name": "hook_num_pill",
+             "rect": [w - 198 - 40, 146 - 70, w - 198 + 40, 146 + 70]},
+        ]
+    else:
+        overlay_geoms = [
+            {"name": "story_badge",
+             "rect": [w - 396, 146, w - 396 + 276, 278]},
+            {"name": "watermark", "rect": [60, 190, 300, 228]},
+            {"name": "hook_num_pill",
+             # single 132pt digit centered on the badge (badge center x =
+             # w-396+138 = w-258): ~80px wide, ~140px tall
+             "rect": [w - 258 - 40, 212 - 70, w - 258 + 40, 212 + 70]},
+            {"name": "captions", "anchor": [60, 1450]},
+        ]
     # Hook pill x = badge center x, so the number never jumps between the
     # hooks and the deep-dives (2026-10-11: the safe-area move shifted the
     # badge left but the pill stayed behind — root cause of the jump).
     pill_x = w - 198  # 2026-10-11: matches badge center (W-336+138)
+    # Landscape: badge sits at y=80, so the pill centers at y=146.
+    pill_y = 146 if LANDSCAPE else 212
     story_ids = {str(sid).lower().replace("-", " ").replace("_", " ")
                  for sid in script.get("story_ids", [])}
     for si, seg in enumerate(script["segments"]):
@@ -966,8 +1338,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             eend = max(estart + 0.5, seg_end - 0.15)
             emph_events.append(
                 f"Dialogue: 0,{_ts(estart)},{_ts(eend)},HookNum,,0,0,0,,"
-                f"{{\\fad(300,250)\\pos({pill_x},212)}}#{n}")
+                f"{{\\fad(300,250)\\pos({pill_x},{pill_y})}}#{n}")
             print(f"[render] hook {si}: numbered pill {n} at top-right")
+            continue
+        if LANDSCAPE:
+            # Landscape (2026-10-13): story emphasis pills are skipped —
+            # the terminal panel already shows the narration as it's
+            # spoken. Hook number pills (above) are kept.
             continue
         emph = (seg.get("emphasis") or "").strip()
         # Guard: emphasis must be a human punch label ("ROGUE AGENTS",
@@ -1040,6 +1417,27 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     # Overlay geometry sidecar for QA safe-area checks.
     (ROOT / "output" / "overlays.json").write_text(json.dumps(
         {"width": w, "height": h, "overlays": overlay_geoms}, indent=1))
+    if LANDSCAPE:
+        # YouTube chapters for the video description (2026-10-13):
+        # story start times + titles, in story order.
+        def _mmss(sec):
+            m, s = divmod(int(sec), 60)
+            return f"{m:02d}:{s:02d}"
+        titles = {}
+        for src_i, sid in enumerate(script.get("story_ids", [])):
+            srcs = script.get("sources", [])
+            titles[str(sid)] = (srcs[src_i]["title"]
+                                if src_i < len(srcs) else str(sid))
+        lines = ["00:00 Intro"]
+        for si, seg in enumerate(script["segments"]):
+            sid = str(seg.get("story_id") or "")
+            if seg.get("kind") == "story" and sid and si < len(timings):
+                n = story_num.get(sid, 0)
+                lines.append(f"{_mmss(timings[si]['start'])} "
+                             f"#{n} {titles.get(sid, sid)}")
+        (ROOT / "output" / "chapters_landscape.txt").write_text(
+            "\n".join(lines) + "\n")
+        print(f"[render] chapters_landscape.txt ({len(lines)} chapters)")
 
 
 if __name__ == "__main__":
