@@ -29,7 +29,7 @@ VCACHE = ROOT / "cache" / "verified"
 VCACHE.mkdir(parents=True, exist_ok=True)
 
 
-def _build_hook_pairs(script):
+def _build_hook_pairs(script, mode="daily"):
     """Stack each story's person photo over its company logo.
 
     Saves pipeline/cache/verified/hook_pair_<story_id>.png for the 5
@@ -38,6 +38,10 @@ def _build_hook_pairs(script):
     (2026-10-12: person-less stories used to fall back to a generic
     screenshot in the hook — the logo is the correct hook visual).
     Skips stories with neither person nor logo.
+
+    Landscape mode (2026-10-13): person LEFT, logo RIGHT, side by side —
+    the natural 16:9 arrangement. Saved as hook_pair_<sid>_landscape.png
+    so the two orientations never collide in the shared cache.
     """
     from PIL import Image
     story_ids = script.get("story_ids", [])
@@ -45,6 +49,8 @@ def _build_hook_pairs(script):
     story_icons = script.get("story_icons", {})
     for sid in story_ids:
         out = ROOT / "cache" / "verified" / f"hook_pair_{sid}.png"
+        if mode == "landscape":
+            out = ROOT / "cache" / "verified" / f"hook_pair_{sid}_landscape.png"
         if out.exists():
             continue
         pf = story_people.get(sid, "")
@@ -52,8 +58,9 @@ def _build_hook_pairs(script):
         person = None
         if pp and pp.exists():
             person = Image.open(pp).convert("RGB")
-            r = 240 / person.height
-            person = person.resize((int(person.width * r), 240),
+            ph = 300 if mode == "landscape" else 240
+            r = ph / person.height
+            person = person.resize((int(person.width * r), ph),
                                    Image.LANCZOS)
         logo = None
         lspec = story_icons.get(sid)
@@ -86,17 +93,27 @@ def _build_hook_pairs(script):
             continue
         if person is None:
             # Logo-only pair for person-less stories.
-            stacked = logo
+            composed = logo
             print(f"[visuals] hook pair built (logo-only): {out.name}")
         elif logo is None:
-            stacked = person
+            composed = person
+        elif mode == "landscape":
+            # Side-by-side (2026-10-13): person left, logo right, 24px gap,
+            # vertically centered on the taller of the two.
+            gap = 24
+            ch = max(person.height, logo.height)
+            cw = person.width + gap + logo.width
+            composed = Image.new("RGB", (cw, ch), (0, 0, 0))
+            composed.paste(person, (0, (ch - person.height) // 2))
+            composed.paste(logo, (person.width + gap,
+                                  (ch - logo.height) // 2))
         else:
             cw = max(person.width, logo.width)
             ch = person.height + 12 + logo.height
-            stacked = Image.new("RGB", (cw, ch), (0, 0, 0))
-            stacked.paste(person, ((cw - person.width) // 2, 0))
-            stacked.paste(logo, ((cw - logo.width) // 2, person.height + 12))
-        stacked.save(out)
+            composed = Image.new("RGB", (cw, ch), (0, 0, 0))
+            composed.paste(person, ((cw - person.width) // 2, 0))
+            composed.paste(logo, ((cw - logo.width) // 2, person.height + 12))
+        composed.save(out)
         if person is not None:
             print(f"[visuals] hook pair built: {out.name}")
 
@@ -1657,14 +1674,16 @@ def main():
     # (00:05-00:34) show the stacked person-photo + company-logo pair,
     # not the generic visual. Auto-built here from the pinned person
     # photos + story_icons logos so the daily run never needs manual work.
-    _build_hook_pairs(script)
+    _build_hook_pairs(script, mode)
     for s in visuals:
         if s.get("seg_kind") == "hook" and s.get("segment") not in (0, None):
             seg_idx = s["segment"]
             if seg_idx < len(script.get("segments", [])):
                 sid = script["segments"][seg_idx].get("story_id")
                 if sid:
-                    pair = ROOT / "cache" / "verified" / f"hook_pair_{sid}.png"
+                    _sfx = "_landscape" if mode == "landscape" else ""
+                    pair = (ROOT / "cache" / "verified"
+                            / f"hook_pair_{sid}{_sfx}.png")
                     if pair.exists():
                         s["path"] = str(pair.resolve())
                         s["kind"] = "photo"
