@@ -81,6 +81,16 @@ def youtube_upload(video: Path, title: str, description: str, tags: list,
 
 def main():
     mode = sys.argv[sys.argv.index("--mode") + 1] if "--mode" in sys.argv else "daily"
+    # Quarantine enforcement (2026-10-09): never publish unless the latest
+    # QA run passed. run.py's stage order already guarantees this; this is
+    # the belt-and-braces check so no future caller can skip the gate.
+    try:
+        failures = json.loads((ROOT / "output" / "qa.json").read_text())["failures"]
+    except Exception:
+        failures = ["qa.json missing"]
+    if failures:
+        print(f"[publish] REFUSED — QA failures not cleared: {failures}")
+        sys.exit(1)
     video = ROOT / "output" / f"ainews_{mode}.mp4"
     script = json.loads((ROOT / "output" / "script.json").read_text())
     tags = script.get("hashtags", [])
