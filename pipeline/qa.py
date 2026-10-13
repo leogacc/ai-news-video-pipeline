@@ -139,14 +139,18 @@ def main():
               0 < moov_at < mdat_at, f"(moov@{moov_at}, mdat@{mdat_at})")
 
     # Safe-area guard (short-form-video/shot-composition, 2026-10-11):
-    # no burned-in overlay may sit under TikTok's UI — top 140px, bottom
-    # 20%, right 120px on 1080x1920. Geometry comes from render.py's
+    # no burned-in overlay may sit under platform UI. 9:16: TikTok's zones
+    # — top 140px, bottom 20%, right 120px on 1080x1920. Landscape
+    # (2026-10-13): YouTube has minimal persistent chrome — guard the top
+    # title-safe strip (70px), the end-screen right side (40px), and the
+    # bottom player bar (7%). Geometry comes from render.py's
     # overlays.json sidecar (single source of truth); anchors get a
     # ±60x±70 tolerance box, rects are exact.
     ojs = ROOT / "output" / "overlays.json"
     if ojs.exists():
         ov = json.loads(ojs.read_text())
         W_, H_ = ov["width"], ov["height"]
+        _land = W_ > H_
         bad = []
         for o in ov["overlays"]:
             if "rect" in o:
@@ -154,9 +158,15 @@ def main():
             else:
                 ax, ay = o["anchor"]
                 x0, y0, x1, y1 = ax - 60, ay - 70, ax + 60, ay + 70
-            if y0 < 140 or x1 > W_ - 120 or y1 > int(H_ * 0.80):
+            if _land:
+                intrudes = (y0 < 70 or x1 > W_ - 40
+                            or y1 > int(H_ * 0.93))
+            else:
+                intrudes = (y0 < 140 or x1 > W_ - 120
+                            or y1 > int(H_ * 0.80))
+            if intrudes:
                 bad.append(o["name"])
-        check("overlays clear of TikTok UI zones", not bad,
+        check("overlays clear of platform UI zones", not bad,
               f"({bad} intrude)" if bad else "")
 
     # The high-school requirement, enforced in code.
