@@ -4,6 +4,25 @@ Every pipeline upgrade bumps `VERSION` and adds an entry here, newest first.
 The version is stamped into every render's `qa.json` (`pipeline_version`)
 so any video can be traced to the exact code that built it.
 
+## 2026.10.13.1 — 2026-10-13
+- Landscape mode (user): new 16:9 `landscape` config mode (1920x1080) and
+  render path, developed on the `landscape-layout` branch. Story
+  deep-dives split the frame — left third is a live terminal panel typing
+  the narration in green mono synced to TTS word timings (this IS the
+  caption track in landscape; no ASS captions burned), right two-thirds
+  plays the visual. Intro/hooks/branding stay full-frame: wide terminal
+  intro, side-by-side person+logo hook pairs (new
+  `hook_pair_<sid>_landscape.png`, cache-safe alongside the 9:16 pairs),
+  pillarboxed self-plug. Story badge top-right of the visual region,
+  watermark top-left of the visual region, hook number pills centered on
+  the badge. Story emphasis pills skipped in landscape (the panel shows
+  the text). QA safe-area check is mode-aware (YouTube zones: top 70px,
+  right 40px, bottom 7%). Render writes `chapters_landscape.txt` (YouTube
+  description chapters). Two-up render support: a shot with
+  `two_up`/`path2` shows both visuals side by side in the visual region
+  (data contract documented; worker markup pending). The 9:16 daily path
+  is untouched.
+
 ## 2026.10.12.3 — 2026-10-12
 - Story ordering rule change (user): most interesting/important story
   FIRST — supersedes the 2026-10-11 smallest-first crescendo rule.
