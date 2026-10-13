@@ -95,7 +95,11 @@ def _load_intro_logo(p):
         return None
     if sum(lum) / len(lum) < 80:
         # Dark mark on transparency: invert the colors, keep the alpha.
-        inv = ImageOps.invert(rgba.convert("RGB"))
+        # (2026-10-13: normalize the inverted white to 85% — a raw
+        # inversion glares pure-white against native white logos. User:
+        # "make an effort to always find white logo and make background
+        # black" — inverted marks should read as white, not glare.)
+        inv = ImageOps.invert(rgba.convert("RGB")).point(lambda q: int(q * 0.85))
         rgba = Image.merge("RGBA", (*inv.split(), alpha))
     flat = Image.alpha_composite(
         Image.new("RGBA", rgba.size, (0, 0, 0, 255)), rgba).convert("RGB")
@@ -122,7 +126,7 @@ def _guard_logo(rgb, p):
     return rgb
 
 
-def frame_layout(src, W, H, out_path, landscape=False):
+def frame_layout(src, W, H, out_path, landscape=False, max_w=None):
     """Terminal-era still layout (2026-10-09, rev 2026-10-09b).
 
     The frame background is ALWAYS black. Every still is fit *inside* the
@@ -142,7 +146,11 @@ def frame_layout(src, W, H, out_path, landscape=False):
         # centered — no caption zone to protect, the terminal panel owns
         # the text. (The 9:16 math below assumes a 1080x1920 frame and
         # would crush landscape visuals into a y 112..796 band.)
+        # max_w (2026-10-13b): cap fitted width for wordmark logos that
+        # would otherwise sprawl across the region.
         s = min(W / iw, H / ih)
+        if max_w:
+            s = min(s, max_w / iw)
         fg = im.resize((max(1, int(iw * s)), max(1, int(ih * s))),
                        Image.LANCZOS)
         canvas.paste(fg, ((W - fg.width) // 2, (H - fg.height) // 2))
@@ -771,30 +779,35 @@ def main():
         print(f"[render] youtube card generated ({dest.name})")
         return str(dest)
 
-    # Landscape: pre-render one terminal panel clip per story segment.
-    # Shots slice their time range out of it (typing stays in sync).
+    # Landscape: pre-render one terminal panel clip per segment (except
+    # the intro, which is full-frame). Shots slice their time range out
+    # of it, keeping typing in sync. (2026-10-13b: hooks use the split
+    # too — the panel is their caption track.)
     panel_clips = {}
     if LANDSCAPE:
         for si, _seg in enumerate(script["segments"]):
-            if _seg.get("kind") == "story" and _seg.get("story_id"):
-                dest = seg_dir / f"panel_seg{si:02d}.mp4"
-                if _fresh(dest):
-                    print(f"[render] terminal panel seg {si}: reusing "
-                          f"{dest.name}")
-                else:
-                    terminal_panel(si, dest)
-                panel_clips[si] = str(dest)
+            if si == 0:
+                continue  # intro is full-frame terminal
+            dest = seg_dir / f"panel_seg{si:02d}.mp4"
+            if _fresh(dest):
+                print(f"[render] terminal panel seg {si}: reusing "
+                      f"{dest.name}")
+            else:
+                terminal_panel(si, dest)
+            panel_clips[si] = str(dest)
 
     def render_landscape_shot(v, i, dur, seg, n, badge):
-        """Landscape (16:9) shot builder (2026-10-13). Layout per kind:
-        - cold-open intro: full-frame wide terminal intro (intro_video
-          already adapts via the landscape constants).
-        - headline hooks: full-frame side-by-side person+logo pair.
-        - story deep-dives: SPLIT — terminal panel (left third, sliced
-          from the pre-rendered segment panel so typing stays in sync)
-          + visual (right two-thirds).
-        - branding: full-frame self-plug clip, pillarboxed.
-        Story shots carry the number badge top-right of the visual region.
+        """Landscape (16:9) shot builder (2026-10-13, rev 2026-10-13b).
+        Layout:
+        - cold-open intro (segment 0): full-frame wide terminal intro
+          (intro_video adapts via the landscape constants).
+        - EVERYTHING else (headline hooks, branding, story deep-dives):
+          SPLIT — terminal panel (left third, sliced from the
+          pre-rendered segment panel so typing stays in sync) + visual
+          (right two-thirds). The panel is the caption track, so hooks
+          show their narration (user 2026-10-13).
+        Story shots carry the number badge top-right of the visual region;
+        hooks carry their number as an ASS pill instead.
         Two-up: a shot with two_up/path2 renders both visuals side by
         side inside the visual region (data contract for the worker:
         mark the script shot "two_up": true with a "broll2" query;
@@ -825,10 +838,21 @@ def main():
             else:
                 print(f"[render] shot {i}: reusing intro_anim.mp4")
             v = dict(v, kind="clip", path=str(anim))
+        if is_branding:
+            # Self-plug (2026-10-10): Pixar character montage — NOT stock.
+            # Fails LOUD if the clip is missing.
+            clip = ROOT / "cache" / "generated" / "selfplug_pixar.mp4"
+            if not clip.exists():
+                raise FileNotFoundError(
+                    f"[render] FATAL: self-plug clip missing: {clip}")
+            v = dict(v, kind="clip", path=str(clip))
+            print(f"[render] shot {i}: self-plug PIXAR clip ({clip.name})")
 
-        def build_vis(path, is_clip, dest, vw, vh):
+        def build_vis(path, is_clip, dest, vw, vh, max_w=None):
             """Encode one visual-region clip (vw x vh). Photos get the
-            quick elastic zoom-out; clips play once and hold (no-loop)."""
+            quick elastic zoom-out; clips play once and hold (no-loop).
+            max_w caps the fitted image width (2026-10-13b: logo-only
+            hook wordmarks would otherwise fill the region)."""
             if is_clip:
                 vf = (f"format=rgb24,"
                       f"scale={vw}:{vh}:force_original_aspect_ratio=decrease,"
@@ -859,7 +883,7 @@ def main():
             else:
                 src = frame_layout(path, vw * 2, vh * 2,
                                    seg_dir / f"shot_{i:02d}_bg.jpg",
-                                   landscape=True)
+                                   landscape=True, max_w=max_w)
                 frames = max(1, int(dur * fps))
                 zmax = 1.05 if v.get("doc") else 1.12
                 zf = min(frames, int(1.5 * fps))
@@ -880,8 +904,10 @@ def main():
                      "-preset", preset, "-crf", "23", str(dest)])
             return str(dest)
 
-        if v.get("seg_kind") == "story" and v.get("segment") in panel_clips:
-            # SPLIT: panel | visual.
+        # SPLIT (2026-10-13b): every non-intro shot — story deep-dives,
+        # headline hooks, and branding — gets panel | visual. The panel is
+        # the caption track, so hooks finally show their narration.
+        if v.get("segment") in panel_clips:
             vis = seg_dir / f"shot_{i:02d}_vis.mp4"
             if v.get("two_up") and v.get("path2"):
                 # Two visuals side by side inside the visual region.
@@ -897,20 +923,31 @@ def main():
                      str(vis)])
                 print(f"[render] shot {i}: two-up visual")
             else:
-                build_vis(v["path"], v["kind"] == "clip", vis, VIS_W, h)
+                # Hooks (2026-10-13b): cap wordmark width so logo-only
+                # pairs don't sprawl — 900px in the 1280px region.
+                _mw = 1800 if v.get("seg_kind") == "hook" else None
+                build_vis(v["path"], v["kind"] == "clip", vis, VIS_W, h,
+                          max_w=_mw)
             tm = timings[v["segment"]]
             rel = max(0.0, v["start"] - tm["start"])
             fc = (f"[0:v]trim=start={rel:.3f}:end={rel + dur:.3f},"
                   f"setpts=PTS-STARTPTS[p];[p][1:v]hstack=inputs=2[stack]")
             inputs = ["-i", panel_clips[v["segment"]], "-i", str(vis)]
+            _vmap = []
             if badge:
                 # Badge top-right of the visual region (right edge at
-                # frame right, clear of the end-screen zone).
+                # frame right, clear of the end-screen zone). The overlay
+                # is the unlabeled filtergraph output — ffmpeg auto-maps it.
                 fc += f";[stack][2:v]overlay={w-336}:80"
                 inputs += ["-loop", "1", "-i", badge]
+            else:
+                # No badge (hooks): map the labeled hstack output
+                # explicitly — an unmapped labeled filtergraph output
+                # is a fatal "unconnected" error.
+                _vmap = ["-map", "[stack]"]
             run(["ffmpeg", "-y", *inputs,
                  "-filter_complex", fc,
-                 "-t", f"{dur:.2f}", "-an",
+                 "-t", f"{dur:.2f}", "-an", *_vmap,
                  "-c:v", "libx264", "-pix_fmt", "yuv420p",
                  "-colorspace", "bt709", "-color_primaries", "bt709",
                  "-color_trc", "bt709", "-color_range", "tv",
@@ -919,14 +956,7 @@ def main():
                   f"(badge {n})" if badge else f"[render] shot {i}: split")
             return str(out)
 
-        # Full-frame kinds: intro, hooks, branding.
-        if is_branding:
-            clip = ROOT / "cache" / "generated" / "selfplug_pixar.mp4"
-            if not clip.exists():
-                raise FileNotFoundError(
-                    f"[render] FATAL: self-plug clip missing: {clip}")
-            v = dict(v, kind="clip", path=str(clip))
-            print(f"[render] shot {i}: self-plug PIXAR clip ({clip.name})")
+        # Full-frame fallback: only the intro (segment 0) reaches here.
         if v["kind"] == "clip" and is_intro:
             vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,"
                   f"crop={w}:{h},fps={fps},setsar=1")
@@ -934,29 +964,12 @@ def main():
             run(["ffmpeg", "-y", "-i", v["path"], "-t", f"{dur:.2f}",
                  "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                  "-preset", preset, "-crf", "23", str(out)])
-        elif v["kind"] == "clip":
-            build_vis(v["path"], True, out, w, h)
         else:
-            # Hook pair photo, side-by-side person+logo (2026-10-13): the
-            # pair PNG is small — fitting it to the frame leaves it tiny
-            # (first landscape render). Scale it up to a strong display
-            # size (person ~560px tall) and center it on 1920x1080 black
-            # before the elastic zoom-out.
-            from PIL import Image as _Im
-            _pair = _Im.open(v["path"]).convert("RGB")
-            _s = 560 / _pair.height
-            _nw, _nh = int(_pair.width * _s), 560
-            if _nw > 1500:
-                _s = 1500 / _pair.width
-                _nw, _nh = 1500, int(_pair.height * _s)
-            _pair = _pair.resize((_nw, _nh), _Im.LANCZOS)
-            _canvas = _Im.new("RGB", (w, h), (0, 0, 0))
-            _canvas.paste(_pair, ((w - _nw) // 2, (h - _nh) // 2))
-            _bg = seg_dir / f"shot_{i:02d}_bg.jpg"
-            _canvas.save(_bg)
-            print(f"[render] shot {i}: hook pair upscaled to "
-                  f"{_nw}x{_nh}, centered")
-            build_vis(str(_bg), False, out, w, h)
+            # Shouldn't happen — every non-intro segment has a panel.
+            # Render the visual full-frame rather than failing.
+            print(f"[render] WARNING: shot {i} has no panel, full-frame "
+                  f"fallback")
+            build_vis(v["path"], v["kind"] == "clip", out, w, h)
         return str(out)
 
     seg_files = []
@@ -1225,7 +1238,9 @@ def main():
         vf_parts.append(f"tpad=stop_mode=clone:stop_duration={pad:.3f}")
         print(f"[render] padding video {pad:.2f}s to narration length")
     # Landscape (2026-10-13): the terminal panel IS the caption track —
-    # no ASS captions are burned.
+    # no ASS captions are burned. (2026-10-13b: hooks use the split
+    # layout too, so the panel covers them — only the intro is full-frame,
+    # and it types its own text.)
     if not LANDSCAPE:
         vf_parts.append(f"ass={captions}")
     # Watermark (2026-10-10): "@leos.logos" at 50%. Landscape: top-left
