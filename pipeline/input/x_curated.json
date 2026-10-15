@@ -1,1 +1,32 @@
-{"stories":[{"added_at":"2026-10-14T09:59:10Z","source":"Reuters / White House Rapid Response 47 on X","summary":"President Trump posted the real fatal tiger-attack footage from Yorkshire Wildlife Park on Truth Social on Tuesday, captioned 'don't ever mess with nature!', then followed it with an apparently AI-generated video of himself wrestling and befriending the tiger to 'The Lion Sleeps Tonight.' The White House's 'Rapid Response 47' account reshared the footage on X, drawing backlash; victim William Chapman's family urged people to stop sharing it, saying it causes severe distress.","title":"Trump posts real tiger-attack footage then an AI video of himself taming the tiger","url":"https://www.reuters.com/world/uk/family-uk-tiger-attack-victim-urges-end-video-sharing-after-trump-posts-footage-2026-10-14/"},{"added_at":"2026-10-14T09:59:10Z","source":"AP via usa-today-news.com","summary":"At OpenAI's annual developer conference, CEO Sam Altman introduced 'Dots,' 'remarkably capable, always-on' AI agents that complete ongoing tasks proactively — a direct rival to Meta's personal agent Muse, which surged after Meta's conference. He also announced GPT-6.1 Sol, an upgraded GPT-6 Sol, and a premium speed tier called 'Ultrafast.' Altman did not address Monday's disclosure that OpenAI is holding off a model release over researchers' security concerns.","title":"OpenAI's Altman unveils 'Dots' always-on agents, GPT-6.1 Sol, 'Ultrafast' tier","url":"https://usa-today-news.com/news/openai-ceo-announces-new-ai-agent-and-avoids-mention-of-security-concerns-at-developer-conference/"},{"added_at":"2026-10-14T09:59:10Z","source":"themeridiem.com","summary":"USA Today filed a $250 million copyright lawsuit against OpenAI, alleging the company copied 'hundreds of thousands' of articles for AI training without permission and that the unauthorized use 'has done real and continuing harm.' Parent Gannett's network of hundreds of local newspapers joins the fight, signaling coordinated media resistance alongside The Intercept, Ziff Davis, and CBC/Radio-Canada — with potential damages now in the billions.","title":"USA Today files $250M lawsuit against OpenAI as publishers unite","url":"https://www.themeridiem.com/ai/2026/10/08/usa-today-escalates-ai-training-battle-as-publishers-unite-against-openai"},{"added_at":"2026-10-14T09:59:10Z","source":"Fox News (viral X post)","summary":"Brivael Le Pogam, co-founder of French AI company Argil, went viral on Tuesday with an X post warning Americans not to vote Democrat: 'I'm French... I come from your future.' He cited France's public spending at nearly 57% of GDP, no balanced budget since 1974, debt above 3.3 trillion euros, collapsing hospitals despite record funding, declining schools, and engineers leaving for London, Zurich, and San Francisco.","title":"French AI CEO's viral X post warns Americans: 'you don't want to be France'","url":"https://foxnews.com/media/french-ai-ceo-warns-americans-voting-democrat-saying-dont-want-be-france"},{"added_at":"2026-10-14T09:59:10Z","source":"thejoai.com","summary":"The White House restored the UK's access to advanced AI models from OpenAI, Anthropic, and Google DeepMind before public release, reversing a recent restriction. The move was reported in thejoai's AI news roundup alongside Trump's new AI task force requiring developers to report security incidents.","title":"UK regains pre-release access to OpenAI, Anthropic, Google AI models","url":"https://thejoai.com/ai-news/uk-regains-access-to-openai-anthropic-google-ai-models/"}]}
+{
+  "stories": [
+    {
+      "title": "FTC subpoenas OpenAI and Anthropic; eight US states sue OpenAI over ChatGPT harm to children",
+      "summary": "Axios reports the FTC has sought documents from OpenAI and Anthropic over potential consumer-protection violations and plans to compel top AI executives to testify. In parallel, eight US states are taking legal action against OpenAI over alleged ChatGPT-related harm to children and vulnerable users, according to today's roundups. The one-two hit is the latest escalation in a mounting wave of US regulatory pressure on the frontier labs.",
+      "url": "https://www.marketwatch.com/livecoverage/stock-market-today-dow-seen-steady-while-s-p-500-to-fall-nasdaq-to-sputter-on-ai-fears/card/ftc-reportedly-subpoenas-openai-and-anthropic-JvwDh12d9v4h2GL5ejlz",
+      "source": "Axios via MarketWatch / Analytics Insight",
+      "added_at": "2026-10-15T09:59:38Z"
+    },
+    {
+      "title": "AI rout deepens: Nasdaq futures dive 1% as debt and inflation fears hit AI stocks",
+      "summary": "Nasdaq futures fell more than 1% on Thursday as the AI-stock selloff deepened on fears that higher rates will make AI investment harder to fund, Reuters reports. Wednesday saw the Nasdaq and S&P 500 log their biggest one-day drop since July, with CoreWeave down 15%, Oracle off nearly 9%, and $80 billion wiped out. TSMC's cautious 2027 outlook added to the gloom after a sixth straight record quarter.",
+      "url": "https://www.reuters.com/business/nasdaq-futures-dive-1-ai-rout-deepens-debt-concerns-2026-10-15/",
+      "source": "Reuters",
+      "added_at": "2026-10-15T09:59:38Z"
+    },
+    {
+      "title": "GlobalFoundries to operate two new US semiconductor fabs under US-Japan partnership",
+      "summary": "GlobalFoundries has been selected to operate two new semiconductor manufacturing facilities in New York under a US-Japan partnership, today's tech roundup reports. The announcement adds fresh US-based chip capacity at a time when AI demand has kept fabs running hot and TSMC just posted its sixth consecutive record quarter.",
+      "url": "https://www.analyticsinsight.net/tech-news/top-news-today-globalfoundries-plans-two-us-fabs-solvera-raises-usd-63m-uk-internships-tighten-openai-faces-lawsuits",
+      "source": "Analytics Insight",
+      "added_at": "2026-10-15T09:59:38Z"
+    },
+    {
+      "title": "Blackburn's AI-generated dance meme goes viral on eve of early voting",
+      "summary": "Tennessee GOP gubernatorial candidate Marsha Blackburn posted an AI-generated meme of herself dancing to Kendrick Lamar's 'Not Like Us' with other state officials, a day before midterm early voting began. The viral post drew satire, criticism from her Democratic opponent, and questions about compliance with a recently passed state law governing AI deepfakes in political advertising.",
+      "url": "https://www.tennessean.com/story/news/politics/2026/10/14/marsha-blackburn-ai-meme-early-voting-reactions/92246546007/",
+      "source": "The Tennessean",
+      "added_at": "2026-10-15T09:59:38Z"
+    }
+  ]
+}
