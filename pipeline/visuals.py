@@ -29,74 +29,297 @@ VCACHE = ROOT / "cache" / "verified"
 VCACHE.mkdir(parents=True, exist_ok=True)
 
 
-def _build_hook_pairs(script):
+def draw_glyph(name, S=140):
+    """White line-icon glyphs in the terminal aesthetic (2026-10-16).
+
+    Mirrors render.py's intro draw_glyph so hook pairs can render
+    "glyph:<name>" story_icons. Glyph stories previously got NO hook pair
+    (the spec was treated as a filename, found nothing) and fell back to
+    generic stock in the headline hook — which once duplicated the
+    adjacent shot and failed QA. Returns an RGB PIL image, or None for
+    an unknown glyph name.
+    """
+    from PIL import ImageDraw
+    WHITE = (255, 255, 255)
+    im = Image.new("RGB", (S, S), (0, 0, 0))
+    d = ImageDraw.Draw(im)
+    # All coordinates below are in the 140px reference grid; scale the
+    # drawing by re-rendering at a different S via resize if needed.
+    if name == "bubble":        # social post
+        d.rounded_rectangle([20, 25, 120, 95], radius=22,
+                            outline=WHITE, width=10)
+        d.polygon([(45, 95), (45, 120), (75, 95)], fill=WHITE)
+    elif name == "chip":        # compute / AI hardware
+        d.rounded_rectangle([40, 40, 100, 100], radius=8,
+                            outline=WHITE, width=10)
+        d.rectangle([58, 58, 82, 82], outline=WHITE, width=8)
+        for x in (52, 70, 88):
+            d.line([(x, 18), (x, 40)], fill=WHITE, width=8)
+            d.line([(x, 100), (x, 122)], fill=WHITE, width=8)
+            d.line([(18, x), (40, x)], fill=WHITE, width=8)
+            d.line([(100, x), (122, x)], fill=WHITE, width=8)
+    elif name == "scales":      # lawsuit / legal
+        d.line([(70, 18), (70, 115)], fill=WHITE, width=9)
+        d.line([(30, 38), (110, 38)], fill=WHITE, width=9)
+        for cx in (30, 110):
+            d.line([(cx, 38), (cx - 18, 78)], fill=WHITE, width=7)
+            d.line([(cx, 38), (cx + 18, 78)], fill=WHITE, width=7)
+            d.line([(cx - 18, 78), (cx + 18, 78)], fill=WHITE, width=7)
+        d.line([(45, 115), (95, 115)], fill=WHITE, width=9)
+    elif name == "chart-down":  # selloff / markets down
+        d.line([(22, 22), (22, 118), (118, 118)], fill=WHITE, width=9)
+        d.line([(30, 40), (55, 55), (75, 48), (105, 95)],
+               fill=WHITE, width=10, joint="curve")
+        d.polygon([(105, 95), (88, 88), (96, 108)], fill=WHITE)
+    elif name == "chart-up":    # markets up / growth
+        d.line([(22, 22), (22, 118), (118, 118)], fill=WHITE, width=9)
+        d.line([(30, 95), (55, 80), (75, 88), (105, 40)],
+               fill=WHITE, width=10, joint="curve")
+        d.polygon([(105, 40), (88, 48), (96, 28)], fill=WHITE)
+    elif name == "robot":       # AI model / agent
+        d.rounded_rectangle([35, 45, 105, 115], radius=18,
+                            outline=WHITE, width=10)
+        d.line([(70, 45), (70, 25)], fill=WHITE, width=8)
+        d.ellipse([62, 12, 78, 28], fill=WHITE)
+        d.ellipse([50, 70, 62, 82], fill=WHITE)
+        d.ellipse([78, 70, 90, 82], fill=WHITE)
+    elif name == "newspaper":   # press / media
+        d.rectangle([25, 30, 115, 110], outline=WHITE, width=9)
+        d.line([(25, 52), (115, 52)], fill=WHITE, width=7)
+        for yy in (68, 82, 96):
+            d.line([(35, yy), (105, yy)], fill=WHITE, width=6)
+    elif name == "bolt":        # breakthrough / speed
+        d.polygon([(78, 15), (45, 80), (68, 80), (58, 125),
+                   (95, 60), (70, 60)], fill=WHITE)
+    else:
+        return None
+    return im
+
+
+def _hook_character_crop(sid, idx, n_stories, ph=240):
+    """Crop story idx's invented Pixar character from intro_people.png,
+    face-centered via selfplug's detector (characters stand in story
+    order left-to-right, same as the faces list). Resized to ph tall
+    like a person photo. Returns None — with a loud warning — when the
+    detected face count doesn't match the story count: a wrong-character
+    crop is worse than the logo-only fallback."""
+    try:
+        from selfplug import detect_faces, closeup_box
+        src_path = ROOT / "cache" / "verified" / "intro_people.png"
+        if not src_path.exists():
+            print(f"[visuals] hook pair {sid}: no intro_people.png, "
+                  f"logo-only")
+            return None
+        faces = detect_faces(src_path)  # [(cx, cy, w, h)] left-to-right
+        if len(faces) != n_stories:
+            print(f"[visuals] hook pair {sid}: WARNING — detected "
+                  f"{len(faces)} faces in intro_people.png for {n_stories} "
+                  f"stories; cannot map character to story, logo-only")
+            return None
+        src = Image.open(src_path).convert("RGB")
+        sw, sh = src.size
+        cx, cy, _, _ = faces[idx]
+        x0, y0, x1, y1 = closeup_box(cx, cy, sw, sh, n_stories)
+        crop = src.crop((int(x0), int(y0), int(x1), int(y1)))
+        r = ph / crop.height
+        print(f"[visuals] hook pair {sid}: using Pixar character "
+              f"#{idx + 1} from intro_people.png")
+        return crop.resize((int(crop.width * r), ph), Image.LANCZOS)
+    except Exception as e:
+        print(f"[visuals] hook pair {sid}: character crop failed ({e}); "
+              f"logo-only")
+        return None
+
+
+def _build_hook_pairs(script, mode="daily"):
     """Stack each story's person photo over its company logo.
 
     Saves pipeline/cache/verified/hook_pair_<story_id>.png for the 5
     headline hooks. Person photo on top (240px), logo underneath (112px),
-    12px gap. Stories with no person photo get a logo-only pair
-    (2026-10-12: person-less stories used to fall back to a generic
-    screenshot in the hook — the logo is the correct hook visual).
+    12px gap. Stories with no person photo get their invented Pixar
+    character from intro_people.png (2026-10-18, user: every headline
+    hook is a character+icon pair) — face-detected, left-to-right story
+    order; logo-only only when the character can't be mapped safely.
     Skips stories with neither person nor logo.
+
+    Landscape mode (2026-10-13): person LEFT, logo RIGHT, side by side —
+    the natural 16:9 arrangement. Saved as hook_pair_<sid>_landscape.png
+    so the two orientations never collide in the shared cache.
     """
     from PIL import Image
     story_ids = script.get("story_ids", [])
     story_people = script.get("story_people", {})
     story_icons = script.get("story_icons", {})
+    # 2026-10-17 NO-REPEAT-FACES rule (user: when the same company/person
+    # appears in two stories, each hook must show a DIFFERENT shot of that
+    # person). A repeated face across hooks reads as a duplicate visual.
+    # The worker pins distinct photos per story (person_<name>_2.png, ...);
+    # this guard fails loud if two stories map to the same person file so
+    # a repeated face can never ship silently.
+    _seen = {}
+    for sid in story_ids:
+        pf = story_people.get(sid, "")
+        if pf:
+            if pf in _seen:
+                raise ValueError(
+                    f"[visuals] FATAL: stories '{_seen[pf]}' and '{sid}' "
+                    f"both use person photo '{pf}' — pin a DIFFERENT "
+                    f"verified shot of the same person for one of them "
+                    f"(person_<name>_2.png) and re-run. Repeated faces "
+                    f"across headline hooks are not allowed.")
+            _seen[pf] = sid
     for sid in story_ids:
         out = ROOT / "cache" / "verified" / f"hook_pair_{sid}.png"
-        if out.exists():
-            continue
+        if mode == "landscape":
+            out = ROOT / "cache" / "verified" / f"hook_pair_{sid}_landscape.png"
+        # 2026-10-19: ALWAYS rebuild — never skip on out.exists(). The old
+        # skip shipped a stale tiny-Tesla hook pair for 8 hours after the
+        # autocrop fix landed, because the 04:00 build was reused at 12:26.
+        # Rebuilding is milliseconds of PIL work; staleness is a shipped bug.
         pf = story_people.get(sid, "")
         pp = ROOT / "cache" / "verified" / pf if pf else None
         person = None
         if pp and pp.exists():
             person = Image.open(pp).convert("RGB")
-            r = 240 / person.height
-            person = person.resize((int(person.width * r), 240),
+            ph = 300 if mode == "landscape" else 240
+            r = ph / person.height
+            person = person.resize((int(person.width * r), ph),
                                    Image.LANCZOS)
+        if person is None:
+            # 2026-10-18 CHARACTER+ICON PAIRS (user: headline hooks
+            # should show the made-up characters with their icon too,
+            # not just the real people). Person-less stories get their
+            # invented Pixar character cropped from intro_people.png.
+            ph = 300 if mode == "landscape" else 240
+            person = _hook_character_crop(sid, story_ids.index(sid),
+                                          len(story_ids), ph)
         logo = None
         lspec = story_icons.get(sid)
-        if lspec:
+        if lspec and lspec.startswith("glyph:"):
+            # 2026-10-16: glyph specs render as drawn icons (draw_glyph
+            # mirrors render.py's intro glyphs) — glyph stories used to get
+            # no hook pair at all and fell back to generic stock in the
+            # headline hook, which duplicated an adjacent shot and failed
+            # QA's no-consecutive-duplicate gate.
+            _g = draw_glyph(lspec[6:])
+            if _g is not None:
+                logo = _g
+                r2 = 112 / logo.height
+                _lw = min(int(logo.width * r2), 400)
+                # 2026-10-19: cap logo width at 90% of the person photo's
+                # width. A wide logo (Tesla: 361px after autocrop) overflows
+                # the frame when the person photo is narrower — the composed
+                # pair scales as one unit, so the logo must not dominate.
+                # 90% leaves a margin so the mark never kisses the frame edge.
+                if person is not None and _lw > int(person.width * 0.9):
+                    _lw = int(person.width * 0.9)
+                    r2 = _lw / logo.width
+                logo = logo.resize((_lw, int(logo.height * r2)),
+                                   Image.LANCZOS)
+            else:
+                print(f"[visuals] hook pair {sid}: unknown glyph "
+                      f"'{lspec[6:]}'")
+        elif lspec:
             lp = ROOT / "cache" / "verified" / lspec
             if lp.exists():
-                logo = Image.open(lp)
-                if logo.mode == "RGBA":
-                    bg = Image.new("RGB", logo.size, (0, 0, 0))
-                    bg.paste(logo, mask=logo.split()[3])
-                    logo = bg
-                else:
-                    logo = logo.convert("RGB")
-                # 2026-10-12: invert dark marks — a black logo on the
-                # pair's black background would be invisible. Sample only
-                # the opaque mark pixels, not the black background.
+                # 2026-10-13b ROOT CAUSE: invert BEFORE compositing.
+                # The old order composited onto black first, then inverted
+                # the whole thing — turning the black background WHITE.
+                # (That shipped a gray-on-white Lancet pair.) Invert the
+                # RGBA's colors while keeping its alpha, then composite.
                 _rgba = Image.open(lp).convert("RGBA")
                 _a = _rgba.split()[3]
+                # 2026-10-16: key out white page backgrounds. An opaque logo
+                # file (white page background, no real alpha) used to
+                # composite as a white box — the Tencent hook shipped
+                # white-on-black-video. Key near-white to transparent when
+                # it dominates the frame (mirrors render.py's intro logo
+                # loader). 2026-10-19 ROOT CAUSE (user: Meta logo missing
+                # from hook pair): this fired on WHITE-ON-TRANSPARENT logos
+                # too — a white mark on transparency has white RGB even
+                # where alpha=0, so _white.mean() hit 0.98 and the keying
+                # wiped the mark itself. Only key when the file is actually
+                # opaque (alpha ~255 everywhere); real transparency already
+                # handles the background via compositing.
+                import numpy as _np
+                _arr = _np.asarray(_rgba.convert("RGB")).astype(int)
+                _white = _arr.sum(axis=2) > 720
+                _opaque_frac = (_np.asarray(_a) > 250).mean()
+                if _white.mean() > 0.5 and _opaque_frac > 0.95:
+                    _alpha = _np.asarray(_a).copy()
+                    _alpha[_white] = 0
+                    _rgba = Image.fromarray(
+                        _np.dstack([_arr.astype("uint8"), _alpha]), "RGBA")
+                    _a = _rgba.split()[3]
+                    print(f"[visuals] hook pair {sid}: keyed out white "
+                          f"background")
                 _lum = _rgba.convert("L")
                 _mark = [l for l, a in zip(_lum.getdata(), _a.getdata())
                          if a > 10]
                 if _mark and sum(_mark) / len(_mark) < 80:
+                    # Dark mark: invert colors, keep alpha (2026-10-13:
+                    # normalize to 85% white — raw inversions glare).
                     from PIL import ImageOps
-                    logo = ImageOps.invert(logo)
+                    _inv = ImageOps.invert(_rgba.convert("RGB")).point(
+                        lambda q: int(q * 0.85))
+                    _rgba = Image.merge("RGBA", (*_inv.split(), _a))
+                _bg = Image.new("RGBA", _rgba.size, (0, 0, 0, 255))
+                logo = Image.alpha_composite(_bg, _rgba).convert("RGB")
+                # 2026-10-19 LOGO AUTOCROP (user: the Tesla logo rendered
+                # tiny in the intro): pin files often carry huge dead
+                # padding (the Tesla pin was 980x980 with the mark in a
+                # 711x213 middle band). Crop to the content box before
+                # scaling to 112px, or the mark shrinks to a speck.
+                # Mirrors render.py's _autocrop_logo.
+                _mask = logo.convert("L").point(lambda v: 255 if v > 24
+                                                else 0)
+                _bbox = _mask.getbbox()
+                if _bbox:
+                    _x0 = max(0, _bbox[0] - 6)
+                    _y0 = max(0, _bbox[1] - 6)
+                    _x1 = min(logo.width, _bbox[2] + 6)
+                    _y1 = min(logo.height, _bbox[3] + 6)
+                    if _x1 - _x0 >= 8 and _y1 - _y0 >= 8:
+                        logo = logo.crop((_x0, _y0, _x1, _y1))
                 r2 = 112 / logo.height
-                logo = logo.resize((min(int(logo.width * r2), 400), 112),
+                _lw = min(int(logo.width * r2), 400)
+                # 2026-10-19: cap logo width at 90% of the person photo's
+                # width. A wide logo (Tesla: 361px after autocrop) overflows
+                # the frame when the person photo is narrower — the composed
+                # pair scales as one unit, so the logo must not dominate.
+                # 90% leaves a margin so the mark never kisses the frame edge.
+                if person is not None and _lw > int(person.width * 0.9):
+                    _lw = int(person.width * 0.9)
+                    r2 = _lw / logo.width
+                logo = logo.resize((_lw, int(logo.height * r2)),
                                    Image.LANCZOS)
         if person is None and logo is None:
             print(f"[visuals] hook pair SKIP {sid}: no person photo, no logo")
             continue
         if person is None:
-            # Logo-only pair for person-less stories.
-            stacked = logo
-            print(f"[visuals] hook pair built (logo-only): {out.name}")
+            # Logo-only fallback (character crop unavailable).
+            composed = logo
+            print(f"[visuals] hook pair built (logo-only fallback): "
+                  f"{out.name}")
         elif logo is None:
-            stacked = person
+            composed = person
+        elif mode == "landscape":
+            # Side-by-side (2026-10-13): person left, logo right, 24px gap,
+            # vertically centered on the taller of the two.
+            gap = 24
+            ch = max(person.height, logo.height)
+            cw = person.width + gap + logo.width
+            composed = Image.new("RGB", (cw, ch), (0, 0, 0))
+            composed.paste(person, (0, (ch - person.height) // 2))
+            composed.paste(logo, (person.width + gap,
+                                  (ch - logo.height) // 2))
         else:
             cw = max(person.width, logo.width)
             ch = person.height + 12 + logo.height
-            stacked = Image.new("RGB", (cw, ch), (0, 0, 0))
-            stacked.paste(person, ((cw - person.width) // 2, 0))
-            stacked.paste(logo, ((cw - logo.width) // 2, person.height + 12))
-        stacked.save(out)
+            composed = Image.new("RGB", (cw, ch), (0, 0, 0))
+            composed.paste(person, ((cw - person.width) // 2, 0))
+            composed.paste(logo, ((cw - logo.width) // 2, person.height + 12))
+        composed.save(out)
         if person is not None:
             print(f"[visuals] hook pair built: {out.name}")
 
@@ -132,7 +355,16 @@ def _is_text_card(path: str) -> bool:
         im = Image.open(path).convert("RGB")
         arr = np.array(im)
         dark = (arr.mean(axis=2) < 30).mean()
-        return dark > 0.75
+        if dark <= 0.75:
+            return False
+        # 2026-10-18: dark-background PRODUCT PHOTOS (a black laptop on
+        # black) tripped this as text cards — the Surface Laptop Ultra pin
+        # was rejected and the shot fell back to story-owned media. A real
+        # text card's text is BRIGHT: require a meaningful bright-pixel
+        # fraction too. (Anthropic text card: 13% bright; Surface photo:
+        # 0.1% bright, 10% mid-tone laptop body.)
+        bright = (arr.mean(axis=2) > 180).mean()
+        return bright > 0.03
     except Exception:
         return False
 
@@ -153,6 +385,28 @@ _LIB_STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "for", "with",
 def _lib_tokens(q: str) -> set:
     return {t for t in re.findall(r"[a-z0-9]+", q.lower())
             if t not in _LIB_STOP}
+
+
+# 2026-10-17 DOCUMENT-NAMES-SHOT rule (user: a story-opening evidence shot
+# about OpenAI's misalignment disclosure page rendered the republisher's
+# promo banner as its visual). The first-shot story-owned pre-pass assumes
+# the publisher's og:image is editorial art for the story — but when the
+# story URL is a republisher/aggregator, the og:image is a site promo
+# banner that can never depict the named subject. A shot whose
+# visual_subject names a specific document/page must show that document
+# (the screenshot path), never a publisher promo image.
+_DOCUMENT_WORDS = frozenset({
+    "page", "report", "disclosure", "article", "document", "filing",
+    "paper", "memo", "transcript", "post", "blog", "notice", "notices",
+})
+
+
+def _names_document(sh: dict) -> bool:
+    """True when an evidence shot's subject names a specific document/page."""
+    if (sh.get("visual_type") or "") != "evidence":
+        return False
+    subj = (sh.get("visual_subject") or "").lower()
+    return any(w in subj for w in _DOCUMENT_WORDS)
 
 
 def _load_catalog() -> dict:
@@ -463,9 +717,11 @@ _FACE_MODEL = ROOT / "cache" / "models" / "face_yunet.onnx"
 
 
 def detect_face(path):
-    """Largest face center as (fx, fy) in 0..1, measured in the
+    """Largest face as [cx, cy, w, h] in 0..1 fractions, measured in the
     center-cropped 9:16 region — i.e. what the final frame shows.
-    None when no face is found. Uses OpenCV's YuNet DNN detector."""
+    None when no face is found. Uses OpenCV's YuNet DNN detector.
+    (2026-10-13: returns the full box, not just the center — the
+    emphasis pill needs the face SIZE to avoid covering it.)"""
     try:
         import cv2
         img = cv2.imread(str(path))
@@ -489,7 +745,9 @@ def detect_face(path):
             return None
         x, y, w, h = max(faces, key=lambda f: f[2] * f[3])[:4]
         return [round(float(x + w / 2) / cw, 3),
-                round(float(y + h / 2) / ch, 3)]
+                round(float(y + h / 2) / ch, 3),
+                round(float(w) / cw, 3),
+                round(float(h) / ch, 3)]
     except Exception as e:
         print(f"[visuals] face detect failed for '{path}': {e}")
         return None
@@ -739,14 +997,22 @@ def microlink_screenshot(page_url: str):
 
 
 def crop_x_screenshot(path: Path):
-    """Crop an x.com screenshot to the post column, dropping the login
-    sidebar / QR / 'relevant people' rail on the right."""
+    """Crop an x.com screenshot to the post column, dropping the left
+    navigation sidebar.
+
+    2026-10-19 ROOT CAUSE (user: X screenshots cut off the post at 00:49
+    and 02:11): the old crop kept the LEFT 63% (0, 0, 0.63w, h) — but X's
+    post column sits center-right, so that kept the nav sidebar (dead
+    space) and severed the post text mid-sentence. Crop from ~28% instead:
+    drops the left nav, keeps the full post column to the right edge.
+    """
     from PIL import Image
     im = Image.open(path).convert("RGB")
     w, h = im.size
-    cut = int(w * 0.63)
-    im.crop((0, 0, cut, h)).save(path, quality=92)
-    print(f"[visuals] x screenshot cropped {w}x{h} -> {cut}x{h}")
+    left = int(w * 0.28)
+    im.crop((left, 0, w, h)).save(path, quality=92)
+    print(f"[visuals] x screenshot cropped {w}x{h} -> {w-left}x{h} "
+          f"(post column)")
 
 
 # ---------------------------------------------------------------------------
@@ -985,21 +1251,42 @@ def _crop_to_content(dest):
             # PORTRAIT (mobile): headline-anchored crop.
             # Merge glyphs into lines first (horizontal close), then the
             # headline is the tallest TEXT LINE below the site header.
+            # 2026-10-13 ROOT CAUSE (user: title cut off at 00:22): two
+            # bugs. (1) The y-search window (120-450) was tuned for
+            # 500x900 screenshots but the pipeline captures at 1000x1800 —
+            # a headline pushed down by a tall site header (chinatechnews:
+            # header + search box put the headline at y=554) fell outside
+            # the window, so detection failed. (2) The density fallback
+            # used a FIXED 600px height that sliced through multi-line
+            # headlines. Fix: search the top 50% proportionally, group
+            # ALL wrapped headline lines into a block, and size the crop
+            # to the block — never a fixed height.
             kx = max(30, w // 20)
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kx, 7))
             lines = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
             n, labels, stats, _ = cv2.connectedComponentsWithStats(lines, 8)
-            headline_y, headline_h = None, 0
+            # Headline line: tall (>16px at 2x), wide (>25% width), below
+            # the site header, in the top 50% (proportional, not fixed).
+            cands = []
             for i in range(1, n):
                 bh = stats[i, cv2.CC_STAT_HEIGHT]
                 by = stats[i, cv2.CC_STAT_TOP]
                 bw = stats[i, cv2.CC_STAT_WIDTH]
-                # Headline line: tall (>24px), wide (>30% width), below
-                # the site header (y>120), in the top 50%. TOPMOST wins
-                # (article headline sits above hero images/logos).
-                if bh > 16 and bw > w * 0.25 and 120 < by < 450:
-                    if headline_y is None or by < headline_y:
-                        headline_y, headline_h = by, bh
+                if bh > 16 and bw > w * 0.25 and 120 < by < h * 0.5:
+                    cands.append((by, bh))
+            cands.sort()
+            headline_y, headline_bottom = None, None
+            if cands:
+                # TOPMOST wins for the block start; then absorb all
+                # vertically-adjacent headline lines (wrapped title) —
+                # a gap < 2x line height means the same block.
+                headline_y = cands[0][0]
+                headline_bottom = cands[0][0] + cands[0][1]
+                for by, bh in cands[1:]:
+                    if by - headline_bottom < max(120, cands[0][1] * 2):
+                        headline_bottom = by + bh
+                    else:
+                        break
             if headline_y is None:
                 # Fallback: content-based density scan (2026-10-11). Fixed
                 # y-zones misfire when blank ad slots shift the headline
@@ -1014,16 +1301,36 @@ def _crop_to_content(dest):
                         run += 1
                         if run >= 25:
                             y0 = max(0, y - 25 - 20)
-                            y1 = min(h, y0 + 600)
-                            print(f"{tag}: {pol}, density scan found "
-                                  f"content at y={y - 25}")
+                            # 2026-10-13: no fixed height — scan down for
+                            # the end of this content block (sustained
+                            # low-density gap), so headlines aren't sliced.
+                            y1 = min(h, y0 + 900)
+                            gap = 0
+                            for y2 in range(y, h):
+                                if row_den[y2] < 0.015:
+                                    gap += 1
+                                    if gap >= 40:
+                                        y1 = min(h, y2 - 40 + 60)
+                                        break
+                                else:
+                                    gap = 0
+                            if y1 - y0 < 400:
+                                y1 = min(h, y0 + 400)
+                            print(f"{tag}: {pol}, density scan content "
+                                  f"y={y0}-{y1}")
                             break
                     else:
                         run = 0
             else:
+                # Crop to the FULL headline block (2026-10-13): y1 is the
+                # block bottom + padding, never a fixed height — a wrapped
+                # title must be fully in frame. Clamp the window sane.
                 y0 = max(0, headline_y - 30)
-                y1 = min(h, y0 + 560)
-                print(f"{tag}: {pol}, portrait {w}x{h}, headline at y={headline_y}")
+                y1 = min(h, headline_bottom + 60)
+                if y1 - y0 < 400:
+                    y1 = min(h, y0 + 400)
+                print(f"{tag}: {pol}, portrait {w}x{h}, headline block "
+                      f"y={headline_y}-{headline_bottom}")
         else:
             # LANDSCAPE (desktop): band-pass density crop.
             row_den = (mask > 0).mean(axis=1)
@@ -1113,6 +1420,22 @@ def _screenshot_article(page_url, title_hint="", subject_hint=""):
         print(f"{tag}: RESOLVED -> {rurl[:70]}")
     else:
         print(f"{tag}: root confirmed (already an article)")
+    # 2026-10-19 ROOT CAUSE (user: X post screenshots badly cropped at
+    # 00:49/02:11): x.com screenshots are fragile by nature — login walls,
+    # dynamic layout — and every fixed-percentage crop is a guess. X's
+    # official oEmbed returns JUST the tweet (author, handle, text, date);
+    # tweet_card.py renders a clean dark-mode card from it. No nav, no
+    # login wall, no cropping needed. Screenshot path skipped entirely.
+    if "x.com" in rurl or "twitter.com" in rurl:
+        try:
+            from tweet_card import render_tweet_card
+            dest = CACHE / f"tweetcard_{slug(rurl)}.png"
+            render_tweet_card(rurl, dest)
+            print(f"{tag}: DONE -> {dest.name} (X embed tweet card)")
+            return dest, rurl
+        except Exception as e:
+            print(f"{tag}: tweet card failed ({e}) - falling back "
+                  f"to screenshot")
     surl = microlink_screenshot(rurl)
     if not surl:
         print(f"{tag}: FAIL - microlink screenshot failed")
@@ -1138,6 +1461,17 @@ def _screenshot_article(page_url, title_hint="", subject_hint=""):
         crop_x_screenshot(dest)
     else:
         _crop_to_content(dest)
+    # 2026-10-16 ROOT CAUSE (frame review: a Reuters "Access is temporarily
+    # restricted" bot wall shipped on screen): the wall scans above run on
+    # the FULL screenshot, but the content crop can isolate the wall —
+    # the pre-crop page had enough chrome to pass the spread/density
+    # check, then the crop kept only the wall text. Re-scan AFTER
+    # cropping; a crop that isolates a wall is still a wall.
+    if (_is_verification_page(dest) or _is_paywall_modal(dest)
+            or _is_adblock_wall(dest)):
+        print(f"{tag}: REJECTED - wall/modal isolated by crop")
+        dest.unlink(missing_ok=True)
+        return None, None
     print(f"{tag}: DONE -> {dest.name}")
     return dest, rurl
 
@@ -1544,7 +1878,8 @@ def main():
                 source = "verified-pin"
                 print(f"[visuals] shot {idx}: verified pin -> {kind}")
             elif (j == 0 and n < len(assets) and seg_kind == "story"
-                    and not sh.get("person")):
+                    and not sh.get("person")
+                    and not _names_document(sh)):
                 story_asset_n[sid] = n + 1
                 kind, path = assets[n]
                 source = "story-owned"
@@ -1657,17 +1992,23 @@ def main():
     # (00:05-00:34) show the stacked person-photo + company-logo pair,
     # not the generic visual. Auto-built here from the pinned person
     # photos + story_icons logos so the daily run never needs manual work.
-    _build_hook_pairs(script)
+    _build_hook_pairs(script, mode)
     for s in visuals:
         if s.get("seg_kind") == "hook" and s.get("segment") not in (0, None):
             seg_idx = s["segment"]
             if seg_idx < len(script.get("segments", [])):
                 sid = script["segments"][seg_idx].get("story_id")
                 if sid:
-                    pair = ROOT / "cache" / "verified" / f"hook_pair_{sid}.png"
+                    _sfx = "_landscape" if mode == "landscape" else ""
+                    pair = (ROOT / "cache" / "verified"
+                            / f"hook_pair_{sid}{_sfx}.png")
                     if pair.exists():
                         s["path"] = str(pair.resolve())
                         s["kind"] = "photo"
+                        # 2026-10-13: stamp the source — QA's black-frame
+                        # guard reads it, and a stale "black-frame" here
+                        # failed renders that correctly show the pair.
+                        s["source"] = "hook-pair"
                         print(f"[visuals] hook {seg_idx}: pair {pair.name}")
                     else:
                         print(f"[visuals] WARNING: hook pair missing for {sid}")
