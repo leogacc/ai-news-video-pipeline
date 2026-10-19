@@ -1,0 +1,10 @@
+Oct 15 (Reuters) – The US Federal Trade Commission has sent civil subpoenas to AI giants Anthropic and OpenAI, seeking documents about safety incidents, Axios reported on Wednesday, citing a person familiar with the matter.
+The probe comes amid mounting AI safety concerns after models reportedly hacked websites and behaved deceptively or aggressively in testing, highlighting the risks of increasingly autonomous systems and the adequacy of safeguards against harm.
+Last month, Reuters reported that the FTC planned an industry-wide investigation into AI companies.
+The FTC also plans to compel executives at top AI developers, including Anthropic, OpenAI and the research group METR to testify.
+The FTC, OpenAI and Anthropic did not immediately respond to Reuters’ requests for comment on the Axios report.
+The regulator’s demands run to more than 50 pages each and seek information on security incidents, safeguards, marketing materials and privacy policies, the news website reported.
+The FTC has broad authority to sue companies over unfair or deceptive practices, and has used that authority in the past to take action against companies for failing to take reasonable measures to secure consumers’ data.
+FTC Chairman Andrew Ferguson suggested in an interview with Reuters last month that developers who instruct agents in cybersecurity tests that result in hacks should be liable for any harm they cause.
+(Reporting by Anusha Shah and Harshita Mary Varghese in Bengaluru; editing by Leroy Leo and Saumyadeb Chakrabarty)
+Comments
