@@ -20,9 +20,26 @@ Unchanged scripts skip TTS entirely on re-render.
 import difflib
 import hashlib
 import json
+import os
 import re
 import shutil
 from pathlib import Path
+
+# 2026-10-18 TTS HERMETIC (root cause): Kokoro's model is cached locally
+# and the pipeline must never need the network to synthesize. Without
+# this, huggingface_hub builds an httpx client on first synthesis and
+# crashes parsing this VM's proxy env (InvalidURL on the no_proxy
+# IPv6 entries) — any cache-miss TTS run dies at the first segment.
+# (Surfaced when the "Breaking!" delivery change forced a re-synth.)
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+# Same root cause, second half: even in offline mode kokoro's model
+# loader constructs the hub HTTP client, and this httpx version dies
+# parsing the bracketed-IPv6 no_proxy entries before any request is
+# made. TTS is fully offline (model cached above), so drop proxy vars
+# outright instead of crashing inside URL parsing.
+for _k in ("http_proxy", "https_proxy", "all_proxy", "no_proxy",
+           "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"):
+    os.environ.pop(_k, None)
 
 import numpy as np
 import soundfile as sf
@@ -95,6 +112,25 @@ def norm_w(w: str) -> str:
     return re.sub(r"[^a-z0-9]", "", w.lower())
 
 
+# 2026-10-18 BREAKING DELIVERY (user): the cold-open kicker is SPOKEN as
+# an exclamation ("Breaking!") — the "!" gives the voice exclamation
+# energy plus a beat of pause — while every visual caption shows it with
+# NO punctuation. Two text variants from the one script text: tts_text
+# for synthesis, caption_text for the caption-faithful word list.
+# Alignment runs on normalized forms, so "Breaking!"/"Breaking"/
+# "Breaking," all anchor to the same measured timing. Robust to the
+# worker writing "Breaking," / "Breaking" / "Breaking!" — any of them
+# lands in the same place.
+def _tts_text(text: str) -> str:
+    t = re.sub(r"^Breaking,\s*", "Breaking! ", text)
+    t = re.sub(r"^Breaking\s+", "Breaking! ", t)
+    return t
+
+
+def _caption_text(text: str) -> str:
+    return re.sub(r"^Breaking[,.!]\s*", "Breaking ", text)
+
+
 def tokens_to_words(toklist):
     """Group misaki word-tokens into Whisper-style words.
     A token flagged whitespace=True ends the word, so trailing punctuation
@@ -158,8 +194,13 @@ def align_words(script_words, tts_words):
 
 
 def fingerprint(text: str) -> str:
+    # 2026-10-18: "code" versions the synthesis behavior itself. The
+    # Breaking!-chunk merge below changed the audio for identical text —
+    # without a key change the cold open would serve the stale two-chunk
+    # delivery from cache forever.
     key = json.dumps({"t": text, "v": T["voice"], "s": T.get("speed", 1.0),
-                      "l": T["lang_code"], "sr": T["sample_rate"]},
+                      "l": T["lang_code"], "sr": T["sample_rate"],
+                      "code": 2},
                      sort_keys=True)
     return hashlib.sha1(key.encode()).hexdigest()[:16]
 
@@ -182,9 +223,22 @@ def synth_segment(text: str):
 
     words: [(word, start, end)] — script words, TTS-measured timings.
     sentences: [{text, start, duration}] sliced from the word stream.
+
+    The cold-open "Breaking" is synthesized from the exclaimed variant
+    (_tts_text) and captioned from the punctuation-free variant
+    (_caption_text); see above.
     """
+    tts_input = _tts_text(text)
+    caption_input = _caption_text(text)
     pipeline = _pipeline()
-    sents = split_sentences(text)
+    sents = split_sentences(tts_input)
+    # 2026-10-18 VOICE CONTINUITY (user: the exclaimed "Breaking!"
+    # sounded like a different voice): as its own synthesis chunk Kokoro
+    # resets prosody for the one-word exclamation. Keep it in the SAME
+    # chunk as the sentence that follows — the "!" still buys exclamation
+    # energy + a pause, but the voice stays continuous.
+    if len(sents) > 1 and sents[0].rstrip() == "Breaking!":
+        sents = ["Breaking! " + sents[1]] + sents[2:]
     sr = T["sample_rate"]
     wav_parts, tts_words = [], []
     t = 0.0
@@ -212,7 +266,7 @@ def synth_segment(text: str):
         t += len(tight) / sr
     wav = (np.concatenate(wav_parts) if wav_parts
            else np.zeros(sr, dtype=np.float32))
-    script_words = text.split()
+    script_words = caption_input.split()
     if not tts_words or n_results == 0:
         print("[tts] WARNING: no TTS token timings — even word distribution")
         step = (len(wav) / sr) / max(1, len(script_words))
@@ -239,7 +293,10 @@ def seg_wav(text: str, out: Path):
 
     Returns (sentences, words, hit) — segment-relative timings.
     """
-    fp = fingerprint(text)
+    # Fingerprint on the TTS input (2026-10-18): the "Breaking!" delivery
+    # transform changes the synthesized audio, so it must change the
+    # cache key — otherwise the cold open would serve stale flat audio.
+    fp = fingerprint(_tts_text(text))
     cached, meta_p = CACHE / f"{fp}.wav", CACHE / f"{fp}.json"
     if cached.exists() and cached.stat().st_size > 1000 \
             and meta_p.exists():
