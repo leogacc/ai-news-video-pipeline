@@ -68,6 +68,26 @@ def detect_faces(path):
         for b in boxes:
             if not any(_iou(b, k) > 0.15 or _inside(b, k) for k in kept):
                 kept.append(b)
+        # 2026-10-14 ROOT CAUSE FIX (user: at 00:32 the shot zoomed into a
+        # character's hair): YuNet fired a 70x88px false positive ON THE
+        # CURLY HAIR between two heads, and the dedupe kept it (IoU ~ 0 vs
+        # the real face boxes, center not inside any box). The montage then
+        # spent a whole solo segment zooming into hair. In a group portrait
+        # every real face is roughly the same scale, so drop anything under
+        # 25% of the largest box's area — self-calibrating, no hardcoded
+        # pixel sizes. Cap at the 5 largest: intro holds max 5 people.
+        if kept:
+            max_area = max(b[2] * b[3] for b in kept)
+            before = len(kept)
+            kept = [b for b in kept if b[2] * b[3] >= 0.25 * max_area]
+            dropped = before - len(kept)
+            if dropped:
+                print(f"[selfplug] dropped {dropped} micro-detection(s) "
+                      f"<25% of largest face box area (false positives: hair/ears)")
+            if len(kept) > 5:
+                kept.sort(key=lambda b: b[2] * b[3], reverse=True)
+                kept = kept[:5]
+                print("[selfplug] capped at 5 faces (intro max 5 people)")
         return sorted(kept, key=lambda b: b[0])
     except Exception as e:
         print(f"[selfplug] face detection failed: {e}")
@@ -101,6 +121,22 @@ def main():
     else:
         print(f"[selfplug] detected {n} faces, close-up per person")
     boxes = [closeup_box(cx, cy, sw, sh, max(n, 1)) for cx, cy, _, _ in faces]
+    # 2026-10-14: reviewable debug contact sheet — red = YuNet detection,
+    # green = montage close-up box. Frame review can verify every box lands
+    # on a face before the clip ships.
+    try:
+        from PIL import ImageDraw
+        dbg = src.copy()
+        dd = ImageDraw.Draw(dbg)
+        for (cx, cy, w, h) in faces:
+            dd.rectangle([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2],
+                         outline=(255, 0, 0), width=5)
+        for (x0, y0, x1, y1) in boxes:
+            dd.rectangle([x0, y0, x1, y1], outline=(0, 255, 0), width=5)
+        dbg.thumbnail((1080, 1080))
+        dbg.save(ROOT / "cache" / "generated" / "selfplug_boxes.jpg")
+    except Exception as e:
+        print(f"[selfplug] debug sheet failed: {e}")
 
     dest = ROOT / "cache" / "generated" / "selfplug_pixar.mp4"
     cmd = ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
