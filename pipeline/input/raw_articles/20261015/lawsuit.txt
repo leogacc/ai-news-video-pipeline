@@ -1,0 +1,17 @@
+Arizona sues OpenAI over ChatGPT safety concerns and consumer fraud
+PHOENIX - Arizona's Attorney General is suing OpenAI, alleging the artificial intelligence company of deceiving practices and violating Arizona laws.
+The Lawsuit:
+The complaint submitted by AG Kris Mayes on Oct. 14 claims OpenAI violates the Arizona Consumer Fraud Act, including concealing features that render the ChatGPT chatbot "extraordinarily agreeable" and "uniquely sycophantic." She argues its design draws Arizonans, including minors, deeper into the platform to maximize their time spent on ChatGPT.
+Prioritizing profit over safety, Mayes claims ChatGPT pushes for compulsive use among minors by using tactics for the system to agree with what the user is saying, overriding safety guardrails. She also alleges the technology exposes minors to "serious harms" not disclosed, to include less critical thinking skills, encouraging paranoia or delusional thoughts, offering medical guidance, and encouraging unhealthy behaviors.
+"Open AI designed a product to attract young users and keep them engaged for as long as possible so it could capture their extensive personal data for the company’s commercial benefit," said Attorney General Mayes. "Open AI put Arizonans safety at risk by failing to implement adequate user protections or transparency measures, despite clear indications that minors were regularly interacting with its chatbot. We’re suing OpenAI to protect Arizona children and to hold the company accountable for its repeated violations of Arizona law."
+Filed in Maricopa County Superior Court, Mayes said the platform has even generated prompts that can be interpreted as encouraging self harm or violence towards others. For minors, OpenAI allegedly encourages them to share personal information and to withhold that information from parents, family members or friends.
+In the complaint, it claims ChatGPT "maintains a 13+ rating on Apple’s App Store, representing that the platform contains infrequent profanity, medical treatment information, drug use references, sexual content, and violence."
+The backstory:
+OpenAI created the first generative chatbot, ChatGPT, in 2022 for public use. As the most popular chatbot in the world, it accounts for nearly half the marketplace for Americans.
+The complaint says the platform is accessible to everyone and doesn't require age verification.
+What they're saying:
+"By misleading the public into believing that OpenAI is a responsible actor and that ChatGPT was and is a safe, youth appropriate tool that puts safety first, OpenAI has caused consumers in Arizona to increasingly trust and rely on the company and its product," the AG's office said.
+Mayes argues the risks were not communicated to Arizona consumers.
+What you can do:
+Anyone who believes themselves or their children have been a victim of consumer fraud or unfair practices can file a consumer complaint on the Attorney General's website. To have the complaint form sent to you, call the Phoenix office at 602-542-5763, the Tucson office at 520-628-6648, or 800-352-8431 for areas outside of the major cities.
+The Source: Information in this report was gathered from Kris Mayes, attorney general with the Arizona Attorney General's Office; and court filing documents submitted in Maricopa County Superior Court.
