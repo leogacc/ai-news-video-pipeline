@@ -1,0 +1,120 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+/home/hatch/workspace/ai-video-pipeline/.venv/lib/python3.12/site-packages/torch/nn/modules/rnn.py:1011: UserWarning: dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1, but got dropout=0.2 and num_layers=1
+  super().__init__("LSTM", *args, **kwargs)
+/home/hatch/workspace/ai-video-pipeline/.venv/lib/python3.12/site-packages/torch/nn/utils/weight_norm.py:145: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+/home/hatch/workspace/ai-video-pipeline/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 0: 3.0s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 1: 4.0s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 2: 4.6s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 3: 3.4s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 4: 3.0s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 5: 4.7s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 6: 5.4s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 7: 24.6s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 8: 24.3s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 9: 26.4s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 10: 26.4s
+WARNING: Defaulting repo_id to hexgrad/Kokoro-82M. Pass repo_id='hexgrad/Kokoro-82M' to suppress this warning.
+[tts] seg 11: 22.1s
+[tts] narration_full.wav (154.3s)
+[captions] 449 words -> 62 cards -> /home/hatch/workspace/ai-video-pipeline/pipeline/output/captions.ass
+[visuals] article fetch failed for media: 405 Client Error: Not Allowed for url: https://www.digitaltrends.com/computing/openai-is-adding-invisible-watermarks-to-chatgpt-and-codex-for-users-in-the-eu/
+[visuals] shot 0: 'breaking news broadcast intro graphic' -> clip [pixabay]
+[visuals] shot 0: clip review strip saved
+[visuals] shot 1: verified pin -> photo
+[visuals] shot 1: DROPPED logo 'OpenAI' (subject: 'Wikipedia')
+[visuals] shot 2: verified pin -> photo
+[visuals] shot 2: DROPPED logo 'Anthropic' (frame already shows the mark)
+[visuals] shot 3: verified pin -> photo
+[visuals] shot 3: DROPPED logo 'OpenAI' (frame already shows the mark)
+[visuals] shot 4: verified pin -> photo
+[visuals] shot 5: verified pin -> photo
+[visuals] shot 5: DROPPED logo 'Google' (frame already shows the mark)
+[visuals] shot 7: verified pin -> photo
+[visuals] shot 7: DROPPED logo 'OpenAI' (subject: 'Wikipedia')
+[visuals] shot 8: verified pin -> photo
+[visuals] shot 8: DROPPED logo 'OpenAI' (subject: 'Wikimedia')
+[visuals] shot 9: verified pin -> photo
+[visuals] shot 9: DROPPED logo 'OpenAI' (subject: 'Wikidata Query Service')
+[visuals] shot 10: verified pin -> photo
+[visuals] shot 10: +Anthropic logo overlay
+[visuals] shot 11: verified pin -> photo
+[visuals] shot 11: +Anthropic logo overlay
+[visuals] shot 12: screenshot 'https://www.testingcatalog.com/anthropic-launches-claude-hai' -> photo
+[visuals] shot 12: +Anthropic logo overlay
+[visuals] shot 13: verified pin -> photo
+[visuals] shot 13: +OpenAI logo overlay
+[visuals] shot 14: verified pin -> photo
+[visuals] shot 15: verified pin -> photo
+[visuals] shot 16: verified pin -> photo
+[visuals] shot 17: verified pin -> photo
+[visuals] shot 18: DROPPED logo 'Google' (subject: None)
+[visuals] shot 19: verified pin -> photo
+[visuals] shot 20: verified pin -> photo
+[visuals] shot 21: verified pin -> photo
+[visuals] shot 21: +Google logo overlay
+[visuals] shot 2: cut aligned to speech (+0.46s)
+[visuals] shot 4: cut aligned to speech (+0.37s)
+[visuals] shot 5: cut aligned to speech (+0.53s)
+[visuals] shot 7: cut aligned to speech (+0.06s)
+[visuals] shot 10: cut aligned to speech (+0.53s)
+[visuals] shot 13: cut aligned to speech (+0.37s)
+[visuals] shot 16: cut aligned to speech (+0.51s)
+[visuals] shot 19: cut aligned to speech (+0.21s)
+[visuals] 22 shots planned
+[render] ffmpeg -y -stream_loop -1 -i /home/hatch/workspace/ai-video-pipeline/pipeline/cache/clips/337307c8c8f2.mp4 ...
+[render] blurred-fill 1280x1169 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 1080x1080 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 1000x1000 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 2560x1600 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 1200x1200 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] ffmpeg -y -stream_loop -1 -i /home/hatch/workspace/ai-video-pipeline/pipeline/cache/clips/d20896ee45d3.mp4 ...
+[render] blurred-fill 2560x1600 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 2560x1600 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 2560x1600 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+[render] blurred-fill 1612x1800 -> 2160x3840
+[render] ffmpeg -y -loop 1 -framerate 30 ...
+Traceback (most recent call last):
+  File "/home/hatch/workspace/ai-video-pipeline/pipeline/render.py", line 292, in <module>
+    main()
+  File "/home/hatch/workspace/ai-video-pipeline/pipeline/render.py", line 128, in main
+    run(cmd + ["-t", f"{dur:.2f}", "-frames:v", str(frames), "-an",
+  File "/home/hatch/workspace/ai-video-pipeline/pipeline/render.py", line 33, in run
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['ffmpeg', '-y', '-loop', '1', '-framerate', '30', '-i', '/home/hatch/workspace/ai-video-pipeline/pipeline/output/segments/shot_10_bg.jpg', '-loop', '1', '-i', '/home/hatch/workspace/ai-video-pipeline/pipeline/cache/verified/logo_anthropic.png', '-t', '7.63', '-filter_complex', "[0:v]scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='min(1+0.0018*on,1.05)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,setsar=1,drawbox=x=W-300:y=24:w=276:h=132:c=black@0.55:t=fill[base];[1:v]scale=216:96:force_original_aspect_ratio=decrease:flags=lanczos,format=rgba[lg];[base][lg]overlay=W-270:42", '-t', '7.63', '-frames:v', '229', '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '/home/hatch/workspace/ai-video-pipeline/pipeline/output/segments/shot_10.mp4']' returned non-zero exit status 234.
+
+===== STAGE: ingest (daily) — skipped (provided by worker) =====
+
+===== STAGE: write (daily) — skipped (provided by worker) =====
+
+===== STAGE: tts (daily) =====
+
+===== STAGE: captions (daily) =====
+
+===== STAGE: visuals (daily) =====
+
+===== STAGE: render (daily) =====
+EXIT=1
