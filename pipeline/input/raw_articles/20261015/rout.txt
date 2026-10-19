@@ -1,0 +1,14 @@
+Oct 15 (Reuters) – Nasdaq futures fell more than 1% on Thursday as a selloff in AI-related stocks deepened on fears that higher interest rates will make it harder for companies to fund AI investments.
+The Nasdaq and the S&P 500 marked their biggest one-day drop since July on Wednesday after hotter-than-expected inflation data fueled expectations of more interest rate hikes from the Federal Reserve and sent some high-flying tech stocks tumbling.
+Further denting sentiment, TSMC, the world’s largest manufacturer of advanced chips, struck a cautious note for 2027 on Thursday due to macroeconomic uncertainties after reporting its sixth consecutive record quarterly profit.
+CoreWeave, a heavily indebted data center operator, has been at the eye of the recent tech storm and fell 4.5% in premarket trading after a 15% drop on Wednesday.
+Cloud computing giant Oracle fell 2% after a nearly 9% drop in the previous session. The two companies’ bonds also came under pressure, pushing their yields to record highs on Wednesday.
+CoreWeave and Oracle, along with other chipmakers, hyperscalers and cloud companies, triggered a selloff on Wednesday that wiped out $80 billion of market value.
+Chipmakers extended losses too. Nvidia fell 1.3%, while Micron Technology and Advanced Micro Devices dropped 4% and 1.9%, respectively.
+“A slowdown in the AI infrastructure build-out would imply a sharp slowdown in US growth expectations,” said Mohit Kumar, economist at Jefferies.
+“We expect the earnings season to justify that earnings and demand remain robust,” he said, however noting that Jefferies would look to take some chips off the table ahead of the midterm election.
+At 4:04 a.m. ET, S&P 500 E-minis were down 27.5 points, or 0.35%. Nasdaq 100 E-minis were down 380.25 points, or 1.26% and Dow E-minis were up 202 points, or 0.39%.
+Investors will keep a close eye on producer prices data at 8:30 a.m. ET for clues on factory inflation. September retail sales, initial jobless claims data and several business surveys will also be released later in the day.
+Traders are pricing in a 27% chance of a Federal Reserve rate hike later this month, according to CME Group’s Fedwatch tool, up from 20% a week ago. Meanwhile, the odds of a 25 basis point hike in December stood at 67%.
+(Reporting by Sruthi Shankar in Bengaluru; Editing by Rashmi Aich)
+Comments
