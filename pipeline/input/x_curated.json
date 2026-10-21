@@ -1,1 +1,46 @@
-{"stories":[{"added_at":"2026-10-20T10:00:00Z","source":"Reuters via The Hindu BusinessLine","summary":"The US Department of Homeland Security published a Federal Register notice on Oct. 20 confirming an exclusion and removal order covering DeepSeek and affiliate products, plus third-party tools built on DeepSeek implementations, barring future purchases by federal civilian agencies. DHS said the models present \"multiple threat vectors,\" warning that use could send sensitive data to China, yield \"actionable intelligence\" on US persons, or introduce malware. The order dates to July 24 but was only made public Monday, per Reuters.","title":"DHS orders DeepSeek removed from all federal civilian agency systems","url":"https://www.thehindubusinessline.com/info-tech/us-orders-removal-of-deepseek-from-civilian-government-it-systems/article71603248.ece/amp/"},{"added_at":"2026-10-20T10:00:00Z","source":"The Neuron (citing Reuters)","summary":"Reuters reported that a hacker used agentic AI tools to breach more than 100 company websites, including John Deere and SharkNinja, with little human intervention, per today's AI news digests. Microsoft responded with new enterprise controls that can assess agent risk and stop risky agent actions. AI agents appeared on both sides of the security problem: NorForge also found 20+ exposed AI hacking agent panels, one cluster running over 1,100 attack projects.","title":"Hacker breached 100+ sites including John Deere using AI agents","url":"https://www.theneuron.ai/digest/everything-that-happened-in-ai-today-tuesday-october-20-2026/"},{"added_at":"2026-10-20T10:00:00Z","source":"TechCrunch (citing Bloomberg)","summary":"Bloomberg reported Monday that Nvidia-backed Nscale is in talks to sell Anthropic a second roughly $45 billion block of compute capacity at its Monarch data center campus in West Virginia. The 460-megawatt building would run on Nvidia's Vera Rubin chips, and Anthropic also holds a right of first refusal on a planned third building. It follows an August six-year $45 billion agreement at the same site, which would bring the combined value to about $90 billion if completed.","title":"Nscale and Anthropic in talks for second $45B compute deal","url":"https://techcrunch.com/2026/10/19/nscale-and-anthropic-are-reportedly-in-talks-for-yet-another-45-billion-compute-deal/"},{"added_at":"2026-10-20T10:00:00Z","source":"BitRss","summary":"Meta released Muse Wonder and Muse Wonder Full, its most capable models yet and its first frontier release from Superintelligence Labs, described as a step toward \"personal superintelligence\" with Active Memory and Active Focus features built for agentic work. Independent benchmarks from Artificial Analysis scored Wonder Full above Claude Fable 5.1 and GPT-6 Astra but below Claude Opus 5.5, and Abacus.AI's CEO pushed back on Meta's benchmark framing. Meta also detailed Prometheus, the Ohio supercluster that trained the models, with a target of roughly one million GPUs.","title":"Meta releases Muse Wonder and Wonder Full, its most capable models yet","url":"https://bitrss.com/meta-releases-muse-wonder-ai-models-pressuring-leading-rivals-260094"},{"added_at":"2026-10-20T10:00:00Z","source":"Daily Caller (Anthropic's federal affairs head defended on X)","summary":"Anthropic pitched a draft federal bill, tentatively called the AEGIS Act, that would let the Commerce Department seek a court order to pause a frontier model only when it threatens more than 50 deaths or serious injuries, or over $1 billion in damages. Anthony Cimino, Anthropic's head of federal affairs, defended the thresholds on X Sunday, saying they were pulled from existing California law standards and don't absolve companies of liability. Critics argue the bar is too high to be meaningful.","title":"Anthropic drafts AEGIS Act, lets feds pause AI only at catastrophic thresholds","url":"https://dailycaller.com/2026/10/19/anthropic-artificial-intelligence-governance-incident-safety-bill-aegis-act-anthony-cimino"},{"added_at":"2026-10-20T10:00:00Z","source":"USA Today; X via @elonmusk","summary":"Elon Musk posted on X on Oct. 19 that \"Next year, I will give one of my SpaceX shares to every kid in America. This will be the first of many,\" without explaining how the shares would be distributed. The pledge came hours after Anthropic announced a 5% share public benefit fund; Musk replied \"I recommend giving the shares directly to the public.\" With roughly 73 million children and SpaceX near $146 a share, the gift would be worth about $10.5 billion.","title":"Musk pledges a SpaceX share to every kid in America next year","url":"https://www.usatoday.com/story/money/economy/markets/2026/10/19/elon-musk-spacex-shares-kids/92326952007/","x_media_url":"https://x.com/AnthropicAI/status/2111881963657412903"}]}
+{
+  "stories": [
+    {
+      "title": "OpenAI seeks to accelerate $30B round at valuation above $1.4T",
+      "summary": "OpenAI is negotiating to speed up a roughly $30 billion financing round at a valuation above $1.4 trillion, with SoftBank Group and MGX reported in talks to join, according to sources cited by Reuters via The Star. ChatGPT now has 1.2 billion weekly active users, and the money is earmarked for compute and datacenter expansion after this month's GPT-6 rollout, as OpenAI tries to accelerate the round ahead of rival IPOs including Anthropic's expected IPO.",
+      "url": "https://aibriefing.dev/",
+      "source": "AI Briefing (citing Reuters)",
+      "added_at": "2026-10-21T00:33:18Z"
+    },
+    {
+      "title": "DHS bans DeepSeek from civilian agencies, orders removal",
+      "summary": "The Department of Homeland Security published notice on Oct. 20 of an order barring DeepSeek from civilian agency purchasing and ordering agencies to remove it, including third-party products built using DeepSeek. The order reaches past DeepSeek's own app to products developed using DeepSeek implementations, with no carve-out for open weights run on US servers, according to TopFive's summary of the Federal Register notice.",
+      "url": "https://topfive.ai/",
+      "source": "TopFive (citing Federal Register/DHS)",
+      "added_at": "2026-10-21T00:33:18Z"
+    },
+    {
+      "title": "DeepSeek open-sources DeepInfer, its production inference stack",
+      "summary": "DeepSeek said in a Tuesday, Oct. 20 post on X that it has made its in-house inference framework DeepInfer fully open source, saying DeepInfer powers its DeepSeek-V4.1-Flash model at scale with high throughput and low latency. DeepSeek said it is sharing its production stack to help the community lower compute costs, reduce energy use and make AI more affordable, and it is also open sourcing deepseek-recipe, its production token encoding and decoding component aligned with its official API.",
+      "url": "https://www.pymnts.com/news/artificial-intelligence/2026/deepseek-open-sources-inference-tech-to-lower-ai-costs/",
+      "source": "X via @deepseek_ai (via PYMNTS)",
+      "added_at": "2026-10-21T00:33:18Z"
+    },
+    {
+      "title": "Musk announces X algorithm change to reward posts people read",
+      "summary": "Elon Musk announced on Oct. 20 two updates to X's timeline recommendation system: a new AI ranking model built to better predict how long users will spend on content, and a retrieval model that favors posts people actually read to the end. The changes could affect For You feeds by giving greater importance to meaningful attention rather than relying exclusively on familiar engagement signals such as likes, reposts and replies, and Musk claimed active user seconds on X are growing exponentially and hitting new all-time highs nearly every day.",
+      "url": "https://cryptobriefing.com/x-new-ai-ranking-model-timeline/",
+      "source": "Crypto Briefing",
+      "added_at": "2026-10-21T00:33:18Z"
+    },
+    {
+      "title": "Hacker breached 100+ sites using AI agents; Microsoft adds controls",
+      "summary": "Reuters reported that a hacker used agentic tools to breach more than 100 company sites, including John Deere and SharkNinja, with little human intervention. Microsoft introduced enterprise controls that can assess agent risk and stop risky agent actions, putting AI agents on both sides of the security problem in the same day's news.",
+      "url": "https://www.theneuron.ai/digest/everything-that-happened-in-ai-today-tuesday-october-20-2026/",
+      "source": "The Neuron (citing Reuters)",
+      "added_at": "2026-10-21T00:33:18Z"
+    },
+    {
+      "title": "Four Gemini agents beat Minecraft with no human help in 27 hours",
+      "summary": "Four Google DeepMind agents powered by Gemini 4 Argon defeated Minecraft's Ender Dragon with no human intervention, working individually while sharing tips, threats and mistakes through in-game chat and shared memory. The agents split up tasks, warned each other about threats and recovered items from dead teammates, completing the run in 27 hours and 14 minutes after writing 2,783 programs and dying 605 times, in what researchers call the first end-to-end autonomous completion using only the standard Mineflayer library.",
+      "url": "https://www.engadget.com/2289944/google-gemini-4-agents-just-beat-minecraft-with-no-human-intervention/",
+      "source": "Engadget (Google DeepMind paper)",
+      "added_at": "2026-10-21T00:33:18Z"
+    }
+  ]
+}
