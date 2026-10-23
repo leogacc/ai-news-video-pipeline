@@ -1,46 +1,46 @@
 {
   "stories": [
     {
-      "title": "Tech stocks slide as AI spending worries reignite",
-      "summary": "U.S. technology stocks fell sharply on Thursday as investors grew more concerned that soaring spending on artificial intelligence will prove unsustainable, with the Nasdaq Composite sliding 694 points, or 2.6%, its biggest drop since June. Meta fell 7% after disclosing billions of dollars in additional future spending commitments and missing profit expectations despite soaring revenue. Nvidia chief executive Jensen Huang added to the unease by saying the industry lacks the capital needed to fuel growth of so-called neoclouds, while shares of SpaceX, Nvidia and CoreWeave also slid.",
-      "url": "https://www.wsj.com/finance/stocks/u-s-tech-stocks-drop-on-ai-spending-concerns-05400b55",
-      "source": "Wall Street Journal",
-      "added_at": "2026-10-22T23:56:42Z"
+      "title": "OpenAI reportedly closing $30B round at $1.25T valuation ahead of IPO",
+      "summary": "OpenAI is reportedly closing a $30 billion bridge round at a $1.25 trillion valuation before its IPO, according to October 23 briefings. The reported round comes a week after Anthropic's prospectus reset the bar for AI listings, according to the same briefing.",
+      "url": "https://ainews.q-sci.org/today.html",
+      "source": "AI News in 5 Minutes",
+      "added_at": "2026-10-23T23:56:19Z"
     },
     {
-      "title": "Meta ordered to pay $25 billion in New Mexico privacy case",
-      "summary": "A New Mexico judge ordered Meta to pay $25 billion on Wednesday after a jury found the company misled consumers about data privacy, in a case stemming from allegations that Cambridge Analytica obtained data from millions of Facebook users without consent. The judge wrote that Facebook's wrongdoing went to the heart of its core business practices, and found a penalty of more than $219 billion was warranted under state law before reducing it to $25 billion. Meta's chief legal officer said the company is confident it will prevail on appeal.",
-      "url": "https://www.reuters.com/business/meta-ordered-pay-25-billion-new-mexico-after-jury-finds-company-misled-consumers-2026-10-21/",
-      "source": "Reuters",
-      "added_at": "2026-10-22T23:56:42Z"
+      "title": "Treasury proposes wider curbs on US investment in China AI",
+      "summary": "The US Treasury Department proposed rules on October 22 to restrict American investment in artificial intelligence, supercomputing, biotechnology and hypersonic systems in China, Russia, North Korea and other countries of concern. The draft implements legislation passed in December 2025, applies above a $50,000 threshold, and excludes many financial investments including stock purchases. Comments are due December 7.",
+      "url": "https://www.aiaffairs.com/government/us-treasury-proposes-wider-investment-curbs-ai-biotech-china/",
+      "source": "AI Affairs",
+      "added_at": "2026-10-23T23:56:19Z"
     },
     {
-      "title": "AI-found PHP flaws force dozens of government sites offline",
-      "summary": "Two critical PHP vulnerabilities dubbed PHP2Shell, rated 9.2 and found with the help of AI models including GPT and Gemini, have forced 32 UK government services offline and four more into partial disruption as a precaution while patches are applied. Government websites in Germany, France, Belgium, Finland and the Netherlands have also been taken offline, and the U.S. NSA has urged organisations to patch or disconnect vulnerable systems. The flaws allow unauthenticated attackers to execute code on vulnerable servers, and the UK's National Cyber Security Centre warned organisations to patch immediately or consider going offline until fixed.",
-      "url": "https://www.theregister.com/security/2026/10/22/php2shell-puts-dozens-of-uk-government-services-out-of-service/5304840",
-      "source": "The Register",
-      "added_at": "2026-10-22T23:56:42Z"
+      "title": "X reportedly plans to let AI agents write Community Notes",
+      "summary": "X is reportedly planning to use artificial intelligence to write Community Notes, asking developers to submit custom AI agents capable of verifying the authenticity of posts and providing neutral explanations. The move would mark a major shift in the platform's fact-checking programme, which currently relies on human contributors whose notes appear only after consensus from groups that have historically disagreed.",
+      "url": "https://turbo.gadgets360.com/en/ai/x-community-notes-ai-agents-public-posts-twitter-elon-musk-human-users-report-news-8811654",
+      "source": "Gadgets 360",
+      "added_at": "2026-10-23T23:56:19Z"
     },
     {
-      "title": "OpenAI's GPT-6 models arrive on Google Cloud",
-      "summary": "OpenAI announced on October 21 that its frontier models and Codex agentic workflows are coming to Google Cloud's Model Garden, so enterprises can use them where they already build and pay through Google Cloud Marketplace. The initial lineup is GPT-6 Astra, GPT-6.1 Sol and GPT-6 Luna, rolling out now in private preview to select enterprise customers, with general availability expected in the coming weeks. Google Cloud CEO Thomas Kurian said the company is focused on giving customers a broad selection of models, and the models are also slated for Google's Antigravity coding tool and Gemini Agent.",
-      "url": "https://9to5google.com/2026/10/21/openai-gpt-models-google-antigravity-cloud/",
-      "source": "9to5Google",
-      "added_at": "2026-10-22T23:56:42Z"
+      "title": "Epic Games confirms huge AI-first pivot, CEO says on X",
+      "summary": "Epic Games has begun a massive pivot toward AI-first development, with CEO Tim Sweeney confirming on X that the company is moving developers around to retool for maximum AI acceleration. According to Bloomberg reporting, the shift applies to an unannounced shooter combining Marvel and Star Wars characters, whose release was delayed. Epic says the aim is not downsizing but letting teams produce more and better work, with creative control remaining with humans.",
+      "url": "https://players.com.ua/en/news/epic-games-massively-pivots-to-ai-tim-sweeney-confirms-studio-s-change-of-course/",
+      "source": "X via @TimSweeneyEpic / Bloomberg via Players",
+      "added_at": "2026-10-23T23:56:19Z"
     },
     {
-      "title": "Apple adds AI features to Pages, Keynote and Numbers",
-      "summary": "Apple's iWork apps have added new Intelligent Assistant features for Apple Creator Studio subscribers, according to release notes reported on October 22. In Pages the assistant can start a first draft, adjust tone and generate images and shapes from natural language; Keynote can generate slides, presenter notes and images; and Numbers can uncover insights, build complex formulas and suggest charts. Keynote also gains a new Interchange Format (.keyx) for importing and exporting presentations more easily in other apps.",
-      "url": "https://9to5mac.com/2026/10/22/pages-keynote-numbers-just-added-powerful-new-ai-features/",
-      "source": "9to5Mac",
-      "added_at": "2026-10-22T23:56:42Z"
+      "title": "OpenAI's Decisions API is now generally available",
+      "summary": "OpenAI announced that its Decisions API is now generally available for developers, powered by GPT-6 Luna. It is designed to help AI agents and apps make small, recurring decisions such as categorising information, routing requests and selecting the next action, with near real-time decisions using images, text and structured inputs. OpenAI claims decisions up to 10x faster than via the Responses API, with up to 400 questions per request and native JSON inputs.",
+      "url": "https://community.openai.com/t/decisions-api-is-now-generally-available-with-new-updates/1408934",
+      "source": "OpenAI Developer Community",
+      "added_at": "2026-10-23T23:56:19Z"
     },
     {
-      "title": "Ethics complaint filed over suspected AI image in Wisconsin race",
-      "summary": "An Eau Claire resident filed a complaint with the Wisconsin Ethics Commission over U.S. Rep. Derrick Van Orden's use of a potentially AI-generated image of opponent Rebecca Cooke in an advertisement for their October 20 debate. The photo, circulated ahead of the debate on X by @TeamVanOrden, shows Cooke appearing to scowl deeply, and Cooke's campaign contends it was generated rather than a real photo. Van Orden's spokeswoman called the complaint a cheap publicity stunt filed three months too late, after a cease-and-desist letter sent September 30 over an earlier video.",
-      "url": "https://www.jsonline.com/story/news/politics/elections/2026/10/22/cooke-announces-ethics-complaint-over-suspected-van-orden-ai-image/92384578007/",
-      "source": "Milwaukee Journal Sentinel via X",
-      "added_at": "2026-10-22T23:56:42Z"
+      "title": "Canva launches Craft, its first in-house AI image model",
+      "summary": "Canva has introduced Craft, an image generation model designed to create both realistic images and design-focused visuals. Developed by Canva Research, it uses a two-stage process to plan image composition before rendering the final result, was trained on millions of templates from Canva's content library, and supports editable outputs through Magic Layers. It ranked first in the People and Portraits and Landscapes and Nature categories on DesignArena, with faster Craft-fast and Craft-ultrafast versions in development.",
+      "url": "https://betanews.com/article/canva-craft-ai-image-model-designarena-api/",
+      "source": "BetaNews",
+      "added_at": "2026-10-23T23:56:19Z"
     }
   ]
 }
