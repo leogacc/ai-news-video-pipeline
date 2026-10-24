@@ -1,46 +1,39 @@
 {
   "stories": [
     {
-      "title": "OpenAI reportedly closing $30B round at $1.25T valuation ahead of IPO",
-      "summary": "OpenAI is reportedly closing a $30 billion bridge round at a $1.25 trillion valuation before its IPO, according to October 23 briefings. The reported round comes a week after Anthropic's prospectus reset the bar for AI listings, according to the same briefing.",
-      "url": "https://ainews.q-sci.org/today.html",
-      "source": "AI News in 5 Minutes",
-      "added_at": "2026-10-23T23:56:19Z"
+      "added_at": "2026-10-25T00:05:00Z",
+      "source": "USA TODAY (Axios report)",
+      "summary": "Major US banks including Morgan Stanley, JPMorgan Chase, Bank of America, Wells Fargo and Citi have moved to limit or block third-party AI agents from accessing customer accounts, after Axios reported agents logging in with customers' own credentials and in some cases acting beyond user instructions. Citi told USA TODAY it does not permit third-party agents to log in or transact, while JPMorgan CEO Jamie Dimon said on the bank's October 13 earnings call that it would not allow unrestricted outside-agent access. Sen. Bernie Sanders called on X for a pause on AI development after the reports, and most banks are leaning toward read-only agent access instead of a blanket ban.",
+      "title": "Major US banks move to block third-party AI agents from customer accounts",
+      "url": "https://www.usatoday.com/story/money/2026/10/23/banks-move-to-limit-ai-agent-access/92385119007/"
     },
     {
-      "title": "Treasury proposes wider curbs on US investment in China AI",
-      "summary": "The US Treasury Department proposed rules on October 22 to restrict American investment in artificial intelligence, supercomputing, biotechnology and hypersonic systems in China, Russia, North Korea and other countries of concern. The draft implements legislation passed in December 2025, applies above a $50,000 threshold, and excludes many financial investments including stock purchases. Comments are due December 7.",
-      "url": "https://www.aiaffairs.com/government/us-treasury-proposes-wider-investment-curbs-ai-biotech-china/",
-      "source": "AI Affairs",
-      "added_at": "2026-10-23T23:56:19Z"
+      "source": "New York Post",
+      "summary": "Programmers are using AI models including Claude Opus 5.5 and ChatGPT's Astra to reverse-engineer classic games and offer free browser-playable versions, including Halo: Combat Evolved, GTA III, Vice City and San Andreas, and Call of Duty: Black Ops, according to the New York Post. AI researcher Luckey Faraday posted a browser-playable Call of Duty recreation on X, had his account briefly suspended after a DMCA demand, and pulled down several game sites himself. Gaming companies are scrambling to shut the unauthorized projects down, but other recreated versions remain online.",
+      "title": "Fans use AI to rebuild Halo, GTA and Call of Duty games free online",
+      "url": "https://nypost.com/2026/10/24/tech/gamers-using-ai-to-put-popular-titles-like-halo-call-of-duty-and-gta-online-for-free/",
+      "added_at": "2026-10-25T00:05:00Z"
     },
     {
-      "title": "X reportedly plans to let AI agents write Community Notes",
-      "summary": "X is reportedly planning to use artificial intelligence to write Community Notes, asking developers to submit custom AI agents capable of verifying the authenticity of posts and providing neutral explanations. The move would mark a major shift in the platform's fact-checking programme, which currently relies on human contributors whose notes appear only after consensus from groups that have historically disagreed.",
-      "url": "https://turbo.gadgets360.com/en/ai/x-community-notes-ai-agents-public-posts-twitter-elon-musk-human-users-report-news-8811654",
-      "source": "Gadgets 360",
-      "added_at": "2026-10-23T23:56:19Z"
+      "added_at": "2026-10-25T00:05:00Z",
+      "source": "Reuters",
+      "summary": "Chinese AI developers DeepSeek and MiniMax have won state approval for global use of their models, Reuters reported on October 23, citing a social media account affiliated with state broadcaster CCTV. The approval comes days after China proposed export controls on 23 AI technologies on October 16, though its commerce ministry said most AI technologies would remain exportable with simplified licensing for open-source exports. DeepSeek and MiniMax did not immediately reply to Reuters' requests for comment.",
+      "title": "DeepSeek and MiniMax win approval for global use of their AI models",
+      "url": "https://www.reuters.com/business/media-telecom/chinas-deepseek-minimax-win-approval-ai-global-use-state-media-affiliated-entity-2026-10-23/"
     },
     {
-      "title": "Epic Games confirms huge AI-first pivot, CEO says on X",
-      "summary": "Epic Games has begun a massive pivot toward AI-first development, with CEO Tim Sweeney confirming on X that the company is moving developers around to retool for maximum AI acceleration. According to Bloomberg reporting, the shift applies to an unannounced shooter combining Marvel and Star Wars characters, whose release was delayed. Epic says the aim is not downsizing but letting teams produce more and better work, with creative control remaining with humans.",
-      "url": "https://players.com.ua/en/news/epic-games-massively-pivots-to-ai-tim-sweeney-confirms-studio-s-change-of-course/",
-      "source": "X via @TimSweeneyEpic / Bloomberg via Players",
-      "added_at": "2026-10-23T23:56:19Z"
+      "added_at": "2026-10-25T00:05:00Z",
+      "source": "AWS Open Source Blog",
+      "summary": "AWS has open-sourced Infinity, an agent runtime that suspends agents during tool calls so huge numbers of them can idle cheaply while waiting on builds, tools or human approvals. The AWS Open Source Blog post says the runtime supports 75,000 concurrent agents on 8 GB of memory at about 100 KB per idle agent and can run on serverless platforms such as Lambda with SQS and Aurora DSQL, requiring no compute while agents wait. A follow-up analysis notes the 75,000-agent figure extrapolates from a server test with a simulated model rather than a Raspberry Pi test.",
+      "title": "AWS open-sources Infinity, a runtime for 75,000 idle AI agents",
+      "url": "https://aws-news.com/article/2026-10-23-introducing-infinity-a-runtime-for-extreme-agent-concurrency"
     },
     {
-      "title": "OpenAI's Decisions API is now generally available",
-      "summary": "OpenAI announced that its Decisions API is now generally available for developers, powered by GPT-6 Luna. It is designed to help AI agents and apps make small, recurring decisions such as categorising information, routing requests and selecting the next action, with near real-time decisions using images, text and structured inputs. OpenAI claims decisions up to 10x faster than via the Responses API, with up to 400 questions per request and native JSON inputs.",
-      "url": "https://community.openai.com/t/decisions-api-is-now-generally-available-with-new-updates/1408934",
-      "source": "OpenAI Developer Community",
-      "added_at": "2026-10-23T23:56:19Z"
-    },
-    {
-      "title": "Canva launches Craft, its first in-house AI image model",
-      "summary": "Canva has introduced Craft, an image generation model designed to create both realistic images and design-focused visuals. Developed by Canva Research, it uses a two-stage process to plan image composition before rendering the final result, was trained on millions of templates from Canva's content library, and supports editable outputs through Magic Layers. It ranked first in the People and Portraits and Landscapes and Nature categories on DesignArena, with faster Craft-fast and Craft-ultrafast versions in development.",
-      "url": "https://betanews.com/article/canva-craft-ai-image-model-designarena-api/",
-      "source": "BetaNews",
-      "added_at": "2026-10-23T23:56:19Z"
+      "added_at": "2026-10-25T00:05:00Z",
+      "source": "AppleInsider",
+      "summary": "Google has begun rolling out Gemini inside Google Maps on Apple CarPlay, starting in the United States with a global rollout underway. Drivers tap a new Gemini icon during navigation to ask multi-step questions by voice, such as finding a park with city views, planning sightseeing and food stops, or routing around toll roads, and to report traffic disruptions by voice. It is the first voice assistant offered by Google Maps on the CarPlay screen itself; Google Assistant previously worked only when navigating directly on the phone.",
+      "title": "Gemini arrives in Google Maps on Apple CarPlay for US drivers",
+      "url": "https://appleinsider.com/articles/26/10/21/google-maps-now-lets-you-ask-gemini-for-help-on-the-road-with-carplay"
     }
   ]
 }
