@@ -1,0 +1,28 @@
+URL: https://www.sofx.com/ai-agents-help-chinese-speaking-hacker-breach-more-than-100-company-websites/
+
+Takeaways Up Front
+1. A Chinese-speaking hacker used AI agents to breach more than 100 company websites, including those belonging to Deere, SharkNinja and Cummins.
+2. The hacker was discovered by a cybersecurity researcher searching the internet for exposed versions of Cairn, an AI platform that coordinates AI agents to perform tasks with minimal human guidance.
+3. The campaign used China’s DeepSeek and Anthropic’s Claude Code and cost an estimated $5,000 in AI tokens.
+A Chinese-speaking hacker used artificial intelligence (AI) agents to break into more than 100 company websites, including those belonging to farm equipment maker Deere, appliance company SharkNinja and engine manufacturer Cummins, Reuters reported on Monday.
+In a report shared with Reuters, Snorre Fagerland, principal threat researcher at cybersecurity company NorForge, said he discovered the hacker while searching the internet for exposed versions of Cairn, an AI platform that coordinates AI agents to solve tasks with minimal human guidance.
+The Chinese-speaking hacker gave the AI agents brief instructions in fewer than 100 Chinese characters, outlining how to break into websites. By late last week, the agents had attempted to breach more than 1,200 websites.
+Fagerland said successful breaches typically required about 23 hours of automated probing and testing to find security weaknesses.
+The campaign reportedly used DeepSeek, an AI service from China, and Anthropic’s Claude Code. It cost an estimated $5,000 in AI tokens, or about $50 per successful breach.
+Fagerland, who has worked in cybersecurity for nearly three decades, said his discovery showed that commercially available AI agents could carry out complex cyberattacks from start to finish without human intervention, significantly increasing what a single hacker could accomplish.
+“It’s a new world now,” said Fagerland. “The development in this field is astounding.”
+Fagerland’s report did not name the companies targeted by the Chinese-speaking hacker. However Reuters identified the victims by independently examining the hacker’s activity on Cairn.
+Deere told the news outlet that it had taken “necessary remediation actions” and had “no indication that sensitive information was accessed.”
+SharkNinja said the breach affected a standalone website containing product support information and that the threat had been contained. Cummins said it was “investigating the report of a potential cyber-attack on a website operated by one of our third-party vendors.”
+Meanwhile, Cairn’s creator has yet to respond to a request for comment. In an earlier social media post, he described the platform as “an innovative type of multi-agent architecture” and said it “was not designed for hacking attacks.”
+The findings add to growing concerns that AI systems can conduct intrusions and steal data with limited human oversight.
+In August, Israeli cybersecurity firm Gambit Security found that Russian-speaking extortionists had used SpaceX’s Cursor AI tool to breach seven organizations. In September, the firm documented another AI agent-driven campaign involving 25 companies and the theft of at least 600,000 credit card records.
+In September, Australian Prime Minister Anthony Albanese announced that an OpenAI-powered AI agent had breached a government health data portal in June, accessing public and non-public files.
+Earlier this month, South Korean President Lee Jae-myung said AI agents were likely used in cyberattacks targeting at least seven financial firms, exposing personal information belonging to at least 68,000 customers. Investigators linked the attacks to ARTEX AI, an open-source tool that uses AI to identify security weaknesses and plan ways to breach systems.
+Sources
+- Reuters, “How one hacker used AI agents and a few thousand dollars to break into scores of sites,” Oct. 19, 2026
+- Tom’s Hardware, “A Chinese hacker used AI agents to break into more than 100 company websites — Deere and SharkNinja among websites hit by open-source AI-powered problem-solving platform demo,” Oct. 2026
+- SOFX, “OpenAI Agent Hacked Australian Medicare Portal,” Sept. 25, 2026
+- SOFX, “South Korea Says AI Agents Likely Breached Seven Financial Firms, 68,000 Customers Exposed,” Oct. 7, 2026
+Stay Ahead of Global Conflict, Security, and Technology.
+Get the #1 daily intel report for decision-makers on global conflict, security, and technology. Over 72,000 leaders trust The SOFX Report to deliver apolitical, fact-based news on issues impacting their lives.
