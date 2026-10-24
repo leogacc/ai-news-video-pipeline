@@ -1,0 +1,83 @@
+# Daily Digest — the main template (current daily pipeline, as of v2026.10.23.10)
+# Status: live. This documents the format the 18:00 PT daily run actually ships.
+# The run itself still reads pipeline/config.yaml and pipeline/*.py — this file
+# is the template definition, not yet a runtime input. Wire it in only on approval.
+id: daily-digest
+name: Daily Digest
+is_main: true
+pipeline_version_documented: 2026.10.23.10
+
+format:
+  width: 1080
+  height: 1920
+  aspect: "9:16"
+  fps: 30
+  codec: h264
+  profile: high
+  level: 4.0
+  pix_fmt: yuv420p
+  faststart: true
+  loudness_lufs: -14
+
+content:
+  stories: 5
+  order: most-interesting-first
+  structure:
+    - hooks: 5 rapid headline cuts, one per story, ~2s each, kind=hook, each with story_id
+    - self_plug: one branding line after the hooks, kind=hook, no story_id
+      text: "This is a top five AI story digest. The digest starts now, follow to stay ahead, the extended version and quick cuts are at the link in bio"
+    - deep_dives: 1-2 segments per story, kind=story, ~55-70 words each, 3-4 distinct facts, never restating the headline
+  words_total: [300, 450]
+  reading_level_max: 9.5  # Flesch-Kincaid
+  duration_target_seconds: ~164
+
+style:
+  captions:
+    style: terminal per-letter typewriter, trailing block cursor
+    color: "#39FF14"
+    background: pure black
+    fade: 70px smoothstep at y 1380..1450
+    text_top_y: 1450
+  number_pills:
+    size: 138x66
+    shape: rounded rectangle, dark, 50% transparent, clean blurred edge
+    format: "n/5"
+    position: upper-right, centred on W-198, 212
+    behaviour: fade in once per story, stay solid through its shots; story-less hooks get none
+  hooks:
+    hero: most relevant source footage (showcase pic/video from the source, or cropped screenshot of the most credible source); person photo only as fallback; a hero previewing its deep-dive article is intentional, not a duplicate
+  self_plug_montage:
+    type: split
+    layout: left side characters, right side company/icon logos
+    logos_from: script.json story_ids -> story_icons (glyphs are drawn icons, not missing-logo fallbacks)
+    motion: simply slides top-to-bottom over the tall split composite, then holds the full split shot with all pairs at once
+    rows: crop ONLY each character's own panel band, never a square face crop that pulls in neighbouring panels
+    cover_fill: never — self-plug clips stay in y 0..1400, above the captions
+  portrait:
+    type: Pixar-style group portrait, 9:16, top-to-bottom story order
+    attire: each character in a DIFFERENT outfit, never all in dark suits
+    background: relevant per character (not pure black)
+    aspect_check: width/height <= 0.85, renderer fails loud on landscape
+  voice:
+    engine: Kokoro
+    voice: am_echo
+    speed: 1.10
+  music: off  # temporary, user 2026-10-23; track preserved as .disabled, never add a copyrighted song
+
+visual_rules:
+  - verified pins outrank all other sources; pin both .jpg and .png for vision-cropped document/X shots
+  - no Commons ever; stock is illustrative generic-action b-roll only
+  - broll queries describe literally visible things, never metaphors
+  - no repeated pages/images/clips (same-URL skip, dHash <=12/256, clip byte-hash)
+  - no black frames, no generic news-list screenshots, no verification/CAPTCHA/paywall/ad walls
+  - no full-frame company logos in deep dives
+  - evidence cannot appear before its subject is spoken; visual changes align with narration/story starts
+  - analytical text above the caption zone; no mid-screen text without an analytical chart
+
+publish:
+  mode: telegram_queue
+  tiktok_description:
+    format: "Here are the five biggest AI stories for {Day, Month Date with ordinal}: [5 clauses, ', and' before last]. [1-2 engagement questions hooked on story #1]\n[exactly 5 hashtags as the FINAL line]"
+    never_claim_to_be_ai: true
+    sent_to_telegram_with_video: true
+  dedupe: never repeat stories already shared (pipeline/state.json posted_ids)
