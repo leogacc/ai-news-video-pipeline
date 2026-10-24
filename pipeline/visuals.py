@@ -1219,6 +1219,60 @@ def _resolve_root_source(page_url, title_hint="", subject_hint=""):
     return None
 
 
+def _snap_edge_to_whitespace(row_den, y, prefer, h, max_scan=140):
+    """Move a horizontal crop edge into the nearest whitespace band so the
+    edge can never rest inside a text line.
+
+    2026-10-20 ROOT CAUSE (user, Oct 20 video at 1:39): the density-scan
+    fallback crop sliced a headline line in half — the box's bottom edge
+    landed mid-glyph and shipped. A whitespace band is >=6 consecutive
+    rows with near-zero ink. `prefer` is the direction tried first
+    (+1 = grow downward for a bottom edge, -1 = grow upward for a top
+    edge): an edge that lands in text almost always meant to INCLUDE
+    that text, so grow first, shrink second. Returns the (possibly
+    unchanged) edge y."""
+    def band_mid(yy, step):
+        start = yy
+        while 0 <= yy + step < h and row_den[yy + step] < 0.002:
+            yy += step
+        return (start + yy) // 2
+
+    def search(step, want_wide):
+        # want_wide (the grow direction): inter-line leading inside a
+        # wrapped block is a whitespace band too, but stopping there
+        # would cleanly DROP the block's remaining lines — keep scanning
+        # past narrow bands (<22 rows) for a real block gap, remembering
+        # the first narrow band as the fallback.
+        run = 0
+        run_start = None
+        fallback = None
+        yy = y
+        while 0 <= yy < h and abs(yy - y) <= max_scan:
+            if row_den[yy] < 0.002:
+                if run == 0:
+                    run_start = yy
+                run += 1
+                if run >= 6:
+                    if not want_wide:
+                        return band_mid(run_start, step)
+                    if fallback is None:
+                        fallback = band_mid(run_start, step)
+                    if run >= 22:
+                        return band_mid(run_start, step)
+            else:
+                run = 0
+            yy += step
+        return fallback
+
+    if 0 <= y < h and row_den[y] < 0.002:
+        return y  # already resting in whitespace
+    r = search(prefer, True)
+    if r is not None:
+        return r
+    r = search(-prefer, False)
+    return r if r is not None else y
+
+
 def _crop_to_content(dest):
     """Crop a page screenshot to its article content (user rule 2026-10-11 #1).
 
@@ -1393,6 +1447,17 @@ def _crop_to_content(dest):
         if (x1 - x0) * (y1 - y0) < 0.08 * w * h:
             print(f"{tag}: box too small - keeping full")
             return False
+        # 2026-10-20: whitespace-snap the horizontal edges as the final
+        # adjustment — no crop edge may rest inside a text line (the
+        # Oct 20 1:39 headline slice). Vision-cropped worker pins are
+        # the standard path now; this is the backstop for auto-crops.
+        row_den = (mask > 0).mean(axis=1)
+        sy0 = _snap_edge_to_whitespace(row_den, y0, -1, h)
+        sy1 = _snap_edge_to_whitespace(row_den, y1, +1, h)
+        if sy1 - sy0 >= 150:
+            if (sy0, sy1) != (y0, y1):
+                print(f"{tag}: edge snap y {y0}-{y1} -> {sy0}-{sy1}")
+            y0, y1 = sy0, sy1
         Image.open(dest).convert("RGB").crop((x0, y0, x1, y1)).save(
             dest, quality=92)
         print(f"{tag}: CROPPED {w}x{h} -> {x1 - x0}x{y1 - y0}")
@@ -1633,6 +1698,17 @@ def fetch_visual(spec: dict, dur: float, w: int, h: int, script_title: str,
         urls = page_urls or []
         if _retry_mode() and len(urls) > 1:
             urls = urls[1:] + urls[:1]
+        # 2026-10-20 ROOT CAUSE (frame review: the Musk X-post shot
+        # screenshotted the CNN article instead of rendering the tweet
+        # card — this loop tries the article URL first and stops at the
+        # first success, so the x.com URL was never reached). When the
+        # shot's subject IS the X post, try x.com URLs first so
+        # _screenshot_article's tweet-card path fires.
+        subj = (spec.get("visual_subject") or "").lower()
+        if any(k in subj for k in ("x post", "x.com", "tweet")):
+            urls = sorted(urls,
+                          key=lambda u: ("x.com" not in u
+                                         and "twitter.com" not in u))
         for purl in urls:
             if path:
                 break
@@ -1988,30 +2064,91 @@ def main():
     # If two shots resolve to byte-identical images, the later one is wrong —
     # replace it with a screenshot of its own story's source.
     _dedupe_shot_images(visuals, script)
-    # Headline-hook pairs (2026-10-11): the 5 numbered story hooks
-    # (00:05-00:34) show the stacked person-photo + company-logo pair,
-    # not the generic visual. Auto-built here from the pinned person
-    # photos + story_icons logos so the daily run never needs manual work.
-    _build_hook_pairs(script, mode)
-    for s in visuals:
-        if s.get("seg_kind") == "hook" and s.get("segment") not in (0, None):
-            seg_idx = s["segment"]
-            if seg_idx < len(script.get("segments", [])):
-                sid = script["segments"][seg_idx].get("story_id")
-                if sid:
-                    _sfx = "_landscape" if mode == "landscape" else ""
-                    pair = (ROOT / "cache" / "verified"
-                            / f"hook_pair_{sid}{_sfx}.png")
-                    if pair.exists():
-                        s["path"] = str(pair.resolve())
-                        s["kind"] = "photo"
-                        # 2026-10-13: stamp the source — QA's black-frame
-                        # guard reads it, and a stale "black-frame" here
-                        # failed renders that correctly show the pair.
-                        s["source"] = "hook-pair"
-                        print(f"[visuals] hook {seg_idx}: pair {pair.name}")
-                    else:
-                        print(f"[visuals] WARNING: hook pair missing for {sid}")
+    # Headline-hook HEROES (2026-10-23, user — REPLACES the 2026-10-11
+    # person+logo pairs, and the PAIR CONSISTENCY rule with them): since
+    # the video now starts with the hooks, each headline hook shows the
+    # most important / captivating / relevant image or video for its
+    # story, full-bleed (render.py portrait-fill), not a stacked pair.
+    # Priority per story:
+    #   1. a distinct pinned hero `hook_hero_<story_id>.png/.jpg/.mp4`
+    #      (the worker pins one per story for future runs — a visual
+    #      NOT used in the deep dive, so the hook is not a repeat);
+    #   2. the story's central person photo (`story_people`) — a face
+    #      reads instantly in a 4s hook, and it is a different file
+    #      from the deep-dive person pin in most runs;
+    #   3. the story's first non-document deep-dive photo (its opener);
+    #   4. the story's first deep-dive shot of any kind.
+    # Cases 3-4 preview the deep-dive opener in the hook (a teaser, the
+    # same subject-preview the old pairs already did with person
+    # photos); only case 1 avoids any repeat, which is why the worker
+    # instruction now asks for distinct heroes.
+    # Landscape keeps the old pair path (parked branch, untouched).
+    if mode == "landscape":
+        _build_hook_pairs(script, mode)
+        for s in visuals:
+            if s.get("seg_kind") == "hook" and s.get("segment") not in (0, None):
+                seg_idx = s["segment"]
+                if seg_idx < len(script.get("segments", [])):
+                    sid = script["segments"][seg_idx].get("story_id")
+                    if sid:
+                        pair = (ROOT / "cache" / "verified"
+                                / f"hook_pair_{sid}_landscape.png")
+                        if pair.exists():
+                            s["path"] = str(pair.resolve())
+                            s["kind"] = "photo"
+                            s["source"] = "hook-pair"
+                            print(f"[visuals] hook {seg_idx}: pair {pair.name}")
+    else:
+        _story_seg = {}
+        for _si, _seg in enumerate(script.get("segments", [])):
+            if _seg.get("kind") == "story" and _seg.get("story_id"):
+                _story_seg.setdefault(str(_seg["story_id"]), _si)
+        for s in visuals:
+            if s.get("seg_kind") != "hook":
+                continue
+            seg_idx = s.get("segment")
+            if seg_idx is None or seg_idx >= len(script.get("segments", [])):
+                continue
+            sid = script["segments"][seg_idx].get("story_id")
+            if not sid:
+                continue  # self-plug / legacy cold-open: render handles it
+            sid = str(sid)
+            hero = None
+            hero_kind, hero_person, hero_doc = "photo", False, False
+            for _ext in (".mp4", ".png", ".jpg"):
+                _hp = ROOT / "cache" / "verified" / f"hook_hero_{sid}{_ext}"
+                if _hp.exists() and _hp.stat().st_size >= 10_000:
+                    hero = str(_hp.resolve())
+                    hero_kind = "clip" if _ext == ".mp4" else "photo"
+                    break
+            if hero is None:
+                _pf = (script.get("story_people", {}) or {}).get(sid, "")
+                _pp = ROOT / "cache" / "verified" / _pf if _pf else None
+                if _pp and _pp.exists() and _pp.stat().st_size >= 10_000:
+                    hero = str(_pp.resolve())
+                    hero_person = True
+            _story_shots = [v for v in visuals
+                            if v.get("segment") == _story_seg.get(sid)
+                            and v.get("seg_kind") == "story"]
+            if hero is None and _story_shots:
+                _opener = next((v for v in _story_shots
+                                if v.get("kind") == "photo"
+                                and not v.get("doc")), None)
+                _pick = _opener or _story_shots[0]
+                hero = _pick["path"]
+                hero_kind = _pick["kind"]
+                hero_person = bool(_pick.get("person"))
+                hero_doc = bool(_pick.get("doc"))
+                if any(v["path"] == hero for v in _story_shots):
+                    print(f"[visuals] hook {seg_idx}: hero previews "
+                          f"deep-dive shot ({Path(hero).name})")
+            if hero:
+                s["path"] = hero
+                s["kind"] = hero_kind
+                s["source"] = "hook-hero"
+                s["person"] = hero_person
+                s["doc"] = hero_doc
+                print(f"[visuals] hook {seg_idx}: hero {Path(hero).name}")
     (ROOT / "output" / "visuals.json").write_text(json.dumps(visuals, indent=2))
     print(f"[visuals] {len(visuals)} shots planned")
 
@@ -2041,8 +2178,9 @@ DHASH_MAX_DIST = 12  # of 256 bits: same image, cropped/resized/recompressed
 
 
 def _dedupe_shot_images(visuals, script):
-    """Every shot must show its own visual — the same article/image must
-    never appear twice in one video, not even cropped differently.
+    """Every shot must show its own visual — the same article/image/CLIP
+    must never appear twice in one video, not even cropped differently
+    or under a different cache filename.
 
     2026-10-11 root-cause fix: two code paths used to MANUFACTURE the
     repeats this guard was supposed to prevent — fetch_visual and the
@@ -2071,20 +2209,45 @@ def _dedupe_shot_images(visuals, script):
             xm_list = xm if isinstance(xm, list) else ([xm] if xm else [])
             story_url_lists[sid] = [u for u in [src.get("url")] + xm_list if u]
             story_titles[sid] = src.get("title") or ""
-    # Map flat shot idx -> story id for replacements
+    # Map visual shot idx -> (story id, broll query) for replacements.
+    # 2026-10-23 FIX: the old mapping counted script["segments"][*]
+    # ["shots"] in order, but hook segments carry nshots=0 in script.json
+    # while visuals carries 6 hook/selfplug shots first — so every story
+    # shot mapped 6 positions early (a Duet duplicate got a PHP article
+    # screenshot). The correct mapping is by segment: the k-th visual in
+    # a segment is the k-th shot of that segment in script.json.
+    # Hooks/selfplug are excluded entirely (see loop below): at dedupe
+    # time they are still placeholders, and heroes/selfplug replace them
+    # afterwards — deduping them only manufactured duplicate-needs-review
+    # flags that QA then treated as black frames (2026-10-23 12:24 run).
     idx_to_sid = {}
-    flat_idx = 0
-    for seg in script.get("segments", []):
-        sid = seg.get("story_id")
-        for _ in seg.get("shots", []):
-            idx_to_sid[flat_idx] = sid
-            flat_idx += 1
+    idx_to_broll = {}
+    _seg_pos = {}
+    for v in visuals:
+        if v.get("seg_kind") != "story":
+            continue
+        _seg = v.get("segment")
+        if _seg is None or _seg >= len(script.get("segments", [])):
+            continue
+        _k = _seg_pos.get(_seg, 0)
+        _seg_pos[_seg] = _k + 1
+        _seg_obj = script["segments"][_seg]
+        idx_to_sid[v["idx"]] = _seg_obj.get("story_id")
+        _shots = _seg_obj.get("shots", [])
+        if _k < len(_shots):
+            idx_to_broll[v["idx"]] = _shots[_k].get("broll") or ""
 
     def _replace_with_fresh_screenshot(v, used_urls, seen_exact, seen_ph):
         """Screenshot the story's first not-yet-shown source URL: resolve
         aggregators to the root article, reject walls, crop to the text
         content box. Returns True on success, False when every URL is used
-        or failed."""
+        or failed. A clip shot replaced this way becomes a document photo,
+        so the renderer never tries to play a .jpg as a clip and never
+        cover-crops its headline.
+        2026-10-23: if every source screenshot fails (e.g. Reuters 401 /
+        wall, as for Duet), a duplicate CLIP gets a second fallback — the
+        2nd Pixabay hit for its own broll query, hash-checked against the
+        duplicate. A different literal clip beats a black-flagged shot."""
         sid = idx_to_sid.get(v["idx"])
         title_hint = story_titles.get(sid, "")
         for url in story_url_lists.get(sid, []):
@@ -2106,6 +2269,8 @@ def _dedupe_shot_images(visuals, script):
             v["path"] = str(dest)
             v["source"] = "screenshot"
             v["shot_url"] = rurl
+            v["kind"] = "photo"
+            v["doc"] = True
             seen_exact[h2] = v["idx"]
             used_urls.add(rurl)
             if ph2 is not None:
@@ -2113,6 +2278,35 @@ def _dedupe_shot_images(visuals, script):
             print(f"[visuals] shot {v['idx']}: replaced with fresh "
                   f"screenshot '{rurl[:60]}'")
             return True
+        # Screenshot fallback exhausted — for a duplicate clip, try a
+        # different stock clip for the same literal query (2nd hit).
+        _broll = idx_to_broll.get(v["idx"], "")
+        if v.get("kind") == "clip" and _broll:
+            try:
+                _url = pixabay_media(_broll, "videos", offset=1)
+            except Exception as e:
+                print(f"[visuals] shot {v['idx']}: pixabay fallback "
+                      f"failed: {e}")
+                _url = None
+            if _url:
+                _dest = CACHE / f"{slug(_broll)}_dupfix.mp4"
+                try:
+                    download(_url, _dest)
+                    _h = hashlib.sha256(open(_dest, "rb").read()).hexdigest()
+                    if _h not in seen_exact and _dest.stat().st_size >= 10000:
+                        v["path"] = str(_dest)
+                        v["source"] = "pixabay-alt"
+                        v["kind"] = "clip"
+                        v["doc"] = False
+                        seen_exact[_h] = v["idx"]
+                        print(f"[visuals] shot {v['idx']}: replaced "
+                              f"duplicate clip with 2nd Pixabay hit "
+                              f"for '{_broll[:60]}'")
+                        return True
+                    _dest.unlink(missing_ok=True)
+                except Exception as e:
+                    print(f"[visuals] shot {v['idx']}: pixabay fallback "
+                          f"download failed: {e}")
         return False
 
     seen_exact = {}  # sha256 -> shot idx
@@ -2121,14 +2315,27 @@ def _dedupe_shot_images(visuals, script):
     used_urls = {v.get("shot_url") for v in visuals if v.get("shot_url")}
 
     for v in visuals:
+        # Hooks/selfplug are placeholders at dedupe time (heroes and the
+        # selfplug montage replace them afterwards) — never dedupe them.
+        if v.get("seg_kind") != "story":
+            continue
         p = v.get("path", "")
-        if not p or not p.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+        if not p or not p.lower().endswith(
+                (".jpg", ".jpeg", ".png", ".webp", ".mp4")):
             continue
         try:
             h = hashlib.sha256(open(p, "rb").read()).hexdigest()
         except Exception:
             continue
-        ph = _dhash(p)
+        # 2026-10-23: clips are byte-hashed too. Two different Pixabay
+        # queries ("person scrolling Facebook", "person reading email")
+        # returned the SAME video file under two cache names, and the
+        # old image-only guard let both shots ship (Meta + Duet, Oct 22
+        # and the 2026.10.23.1 re-render). A clip has no dHash, so the
+        # byte hash is its only identity — a byte-identical clip is a
+        # duplicate, full stop, and gets the same screenshot replacement.
+        ph = _dhash(p) if p.lower().endswith(
+            (".jpg", ".jpeg", ".png", ".webp")) else None
         is_pin = v.get("source") == "verified-pin"
 
         dup_of = None
