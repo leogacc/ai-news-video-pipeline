@@ -37,6 +37,29 @@ def telegram_send(video: Path, caption: str):
     print("[publish] sent to Telegram review queue")
 
 
+def telegram_send_description(script: dict):
+    """Send the TikTok description as its own plain-text Telegram message,
+    right after the video, so it is copy-paste ready on the phone
+    (user, 2026-10-20). Format rules live with the script writer: no AI
+    self-identification, exactly 5 hashtags, ends with a viewer question."""
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat = os.environ["TELEGRAM_CHAT_ID"]
+    text = (script.get("description") or "").strip()
+    tags = script.get("hashtags", [])
+    tag_line = " ".join(t if t.startswith("#") else f"#{t}" for t in tags)
+    if tag_line and tag_line.split()[0] not in text:
+        text = f"{text}\n\n{tag_line}" if text else tag_line
+    if not text:
+        print("[publish] WARNING: no TikTok description in script.json — nothing sent")
+        return
+    r = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data={"chat_id": chat, "text": text[:4096]},
+        timeout=60)
+    r.raise_for_status()
+    print("[publish] TikTok description sent to Telegram")
+
+
 def youtube_upload(video: Path, title: str, description: str, tags: list,
                    publish_at: str | None = None):
     """Needs YOUTUBE_CLIENT_SECRETS (OAuth client JSON, base64) and a prior
@@ -101,6 +124,11 @@ def main():
     yt_id = None
     if publish_mode in ("telegram_queue", "all"):
         telegram_send(video, caption)
+        try:
+            telegram_send_description(script)
+        except Exception as e:
+            print(f"[publish] WARNING: TikTok description NOT sent ({e}) — "
+                  "video is published; send the description manually")
     if publish_mode in ("youtube", "all"):
         yt_id = youtube_upload(
             video, script["title"],
