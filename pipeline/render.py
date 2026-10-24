@@ -157,28 +157,30 @@ def _guard_logo(rgb, p):
     return rgb
 
 
-def frame_layout(src, W, H, out_path, landscape=False, max_w=None):
-    """Terminal-era still layout (2026-10-09, rev 2026-10-09b).
+def frame_layout(src, W, H, out_path, landscape=False, max_w=None,
+                 doc=False, person=False):
+    """Still layout (2026-10-09, rev 2026-10-23 portrait-fill).
 
-    The frame background is ALWAYS black. Every still is fit *inside* the
-    shot region (full width, y TOP_PAD..SHOT_REGION_BOTTOM, centered) over
-    black — portrait shots get black pillars, landscapes get black above
-    and below within the region. The bottom third stays black for the
-    terminal captions, which sit at one fixed spot (top-middle of the
-    bottom third) for the whole video. Returns the path ffmpeg should use.
+    2026-10-23 (user): prioritise shots that FILL the 9:16 frame. A still
+    whose aspect is close enough to 9:16 that a centre cover-crop loses
+    <=30% of the frame is cover-cropped to the full frame — no black
+    pillars, no black bars. Anything else gets a BLURRED background made
+    from its own colours: the image scaled to cover the frame, heavily
+    blurred and darkened, with the sharp image fit inside the visual zone
+    (y 0..1400, above the caption fade) on top of it.
+    Document shots (articles, tables, posts) NEVER cover-crop — a cover
+    crop would slice headline text, which the 2026-10-20 vision-crop
+    standard forbids. They always take the fit + blurred-background
+    path, darkened harder so the text foreground still pops.
+    The caption zone itself is handled in Pass 2 (a pure-black gradient
+    overlay), so the blurred background never fights the captions.
+    Returns the path ffmpeg should use.
     """
-    # 2026-10-11b: stills centered at frame vertical middle (y=960),
-    # not bottom-aligned — bottom-align pushed deep-dive shots off-center.
+    from PIL import ImageEnhance, ImageFilter
     im = Image.open(src).convert("RGB")
     iw, ih = im.size
-    canvas = Image.new("RGB", (W, H), (0, 0, 0))
     if landscape:
-        # Landscape (2026-10-13): fit inside the whole W x H region,
-        # centered — no caption zone to protect, the terminal panel owns
-        # the text. (The 9:16 math below assumes a 1080x1920 frame and
-        # would crush landscape visuals into a y 112..796 band.)
-        # max_w (2026-10-13b): cap fitted width for wordmark logos that
-        # would otherwise sprawl across the region.
+        canvas = Image.new("RGB", (W, H), (0, 0, 0))
         s = min(W / iw, H / ih)
         if max_w:
             s = min(s, max_w / iw)
@@ -187,19 +189,102 @@ def frame_layout(src, W, H, out_path, landscape=False, max_w=None):
         canvas.paste(fg, ((W - fg.width) // 2, (H - fg.height) // 2))
         canvas.save(out_path, quality=92)
         return str(out_path)
-    TOP_PAD, REGION_BOTTOM = int(200 * H / 1920), int(1420 * H / 1920)
-    rw, rh = W, REGION_BOTTOM - TOP_PAD
-    s = min(rw / iw, rh / ih)
+    target_aspect = W / H
+    src_aspect = iw / ih
+    if src_aspect >= target_aspect:
+        cover_loss = 1.0 - target_aspect / src_aspect
+    else:
+        cover_loss = 1.0 - src_aspect / target_aspect
+    # 2026-10-23 (user review fix): a PERSON photo must actually fill
+    # the 9:16 frame, not sit as a strip with blurred background — a
+    # centre crop to 9:16 centred on the detected face keeps the face
+    # whole (crop width is checked against the face box) even when the
+    # centre-crop loss is >30%. Non-person shots keep the old rule.
+    _face_crop = None
+    if person and not doc:
+        try:
+            import cv2
+            _model = ROOT / "cache" / "models" / "face_yunet.onnx"
+            if _model.exists():
+                _img = cv2.imread(str(src))
+                if _img is not None:
+                    _ih, _iw = _img.shape[:2]
+                    _det = cv2.FaceDetectorYN_create(
+                        str(_model), "", (_iw, _ih), 0.5, 0.3, 5000)
+                    _, _faces = _det.detect(_img)
+                    if _faces is not None and len(_faces):
+                        _f = max(_faces, key=lambda f: f[2] * f[3])
+                        _fcx, _fcy = _f[0] + _f[2] / 2, _f[1] + _f[3] / 2
+                        _fw, _fh = _f[2], _f[3]
+                        if src_aspect >= target_aspect:
+                            _cw = int(ih * target_aspect)
+                            if _fw < _cw:
+                                _x0 = int(min(max(_fcx - _cw / 2, 0), iw - _cw))
+                                _face_crop = (_x0, 0, _x0 + _cw, ih)
+                        else:
+                            _ch = int(iw / target_aspect)
+                            if _fh < _ch:
+                                _y0 = int(min(max(_fcy - _ch / 2, 0), ih - _ch))
+                                _face_crop = (0, _y0, iw, _y0 + _ch)
+        except Exception as e:
+            print(f"[render] face-crop skipped ({e})")
+    if _face_crop is not None:
+        crop = im.crop(_face_crop)
+        out = crop.resize((W, H), Image.LANCZOS)
+        out.save(out_path, quality=92)
+        return str(out_path)
+    if not doc and cover_loss <= 0.30:
+        # Full-bleed cover: centre-crop to 9:16, resize to the frame.
+        if src_aspect >= target_aspect:
+            cw = int(ih * target_aspect)
+            x0 = (iw - cw) // 2
+            crop = im.crop((x0, 0, x0 + cw, ih))
+        else:
+            ch = int(iw / target_aspect)
+            y0 = (ih - ch) // 2
+            crop = im.crop((0, y0, iw, y0 + ch))
+        out = crop.resize((W, H), Image.LANCZOS)
+        out.save(out_path, quality=92)
+        return str(out_path)
+    # Blur-pad path: blurred cover background + sharp fit foreground.
+    bg = im.copy()
+    s_bg = max(W / iw, H / ih)
+    bg = bg.resize((max(1, int(iw * s_bg)), max(1, int(ih * s_bg))),
+                   Image.LANCZOS)
+    bx = (bg.width - W) // 2
+    by = (bg.height - H) // 2
+    bg = bg.crop((bx, by, bx + W, by + H))
+    bg = bg.filter(ImageFilter.GaussianBlur(radius=max(20, W // 27)))
+    bg = ImageEnhance.Brightness(bg).enhance(0.45 if doc else 0.70)
+    # Foreground fits the visual zone only: full width, y 0..1400
+    # (in 1920 coords), so it never sits under the caption fade.
+    box_w, box_h = W, int(1400 * H / 1920)
+    s = min(box_w / iw, box_h / ih)
     fg = im.resize((max(1, int(iw * s)), max(1, int(ih * s))),
                    Image.LANCZOS)
-    mid_y = int(960 * H / 1920)
-    safe_bottom = int(1400 * H / 1920)  # 50px above captions — never touch
-    y = mid_y - fg.height // 2
-    if y + fg.height > safe_bottom:
-        y = safe_bottom - fg.height
-    canvas.paste(fg, ((rw - fg.width) // 2, y))
-    canvas.save(out_path, quality=92)
+    bg.paste(fg, ((W - fg.width) // 2, (box_h - fg.height) // 2))
+    bg.save(out_path, quality=92)
     return str(out_path)
+
+
+def caption_gradient_png(dest, W=1080):
+    """Pure-black caption area with a fading (not solid) top edge
+    (2026-10-23, user). Returns a 1080x540 RGBA PNG meant to be overlaid
+    at y=1380: alpha ramps 0 -> 255 over the first 70px with a smoothstep
+    (so the edge reads as a soft blur, never a hard line), then stays
+    solid black to the bottom of the frame (y=1920). Captions start at
+    y=1450, i.e. just below the fade, on pure black."""
+    from PIL import Image
+    fade, total_h = 70, 1920 - 1380
+    img = Image.new("RGBA", (W, total_h), (0, 0, 0, 255))
+    px = img.load()
+    for y in range(fade):
+        t = y / fade
+        a = int(255 * (t * t * (3 - 2 * t)))
+        for x in range(W):
+            px[x, y] = (0, 0, 0, a)
+    img.save(dest)
+    return str(dest)
 
 
 def main():
@@ -224,12 +309,14 @@ def main():
     words = json.loads((ROOT / "output" / "words.json").read_text())
     timings = json.loads((ROOT / "output" / "timings.json").read_text())
     # Story numbering (shot-grammar rule 12): story_ids order defines 1..N.
-    # Story hooks get a numbered pill at center-top third; every shot of a
-    # story's deep-dive segment gets its number as a badge at middle-right
-    # of the top third
-    # (replacing the retired company-logo overlay).
+    # 2026-10-23 (user): hooks and deep-dives carry the SAME number pill —
+    # one PNG, one position, format "n/5" (138x66, centred on the old pill centre). Hooks used to get a separate
+    # ASS text pill (#n, tight black box) while stories got a PNG badge
+    # (#n, rounded dark pill) — different look, different text. Both now
+    # get this badge, composited in the segment stage, centred at (W-198, 212).
     story_num = {str(sid): n + 1
                  for n, sid in enumerate(script.get("story_ids", []))}
+    story_total = len(script.get("story_ids", [])) or 5
 
     def seg_number(si):
         """1-based story number for a segment index, or None."""
@@ -237,22 +324,39 @@ def main():
             return None
         return story_num.get(str(script["segments"][si].get("story_id") or ""))
 
-    def number_badge(n, dest):
-        """276x132 dark pill with a white bold number — the corner badge."""
-        from PIL import Image, ImageDraw, ImageFont
-        W_, H_ = 276, 132
-        img = Image.new("RGBA", (W_, H_), (0, 0, 0, 0))
+    def number_badge(n, dest, total=None):
+        """138x66 rounded-rectangle pill, dark 50% transparent, with a
+        CLEAN blur edge — the one number pill used by both hooks and
+        story deep-dives, format "n/total".
+        2026-10-23 (user: half as small, 50% transparent, clean blur):
+        the pill rect is half the old 276x132, background alpha 128.
+        Blur-root-cause fix: the old pill blurred a mask that filled the
+        whole PNG, so its straight edges sat exactly on the image
+        boundary — alpha jumped 0 -> 255 in 1px at the sides, and only
+        the rounded corners looked soft. The new PNG carries a 24px
+        transparent margin around the rect, and the mask is blurred
+        (radius 14) INTO that margin, so alpha fades 128 -> 0 over
+        ~30px before the canvas edge and the composited edge is soft
+        all the way round, not just at the corners."""
+        from PIL import Image, ImageDraw, ImageFont, ImageFilter
+        total = total or story_total
+        W_, H_, M = 138, 66, 24  # pill rect, plus transparent margin
+        CW, CH = W_ + 2 * M, H_ + 2 * M
+        mask = Image.new("L", (CW, CH), 0)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle([M, M, M + W_ - 1, M + H_ - 1], radius=18,
+                             fill=255)
+        mask = mask.filter(ImageFilter.GaussianBlur(14))
+        img = Image.new("RGBA", (CW, CH), (0, 0, 0, 0))
+        dark = Image.new("RGBA", (CW, CH), (24, 24, 24, 128))
+        img.paste(dark, (0, 0), mask)
         d = ImageDraw.Draw(img)
-        d.rounded_rectangle([0, 0, W_ - 1, H_ - 1], radius=30,
-                            fill=(48, 48, 48, 235))  # 2026-10-12: was
-        # (0,0,0,140) — invisible on black backgrounds, so badges rendered
-        # as bare numbers. A lifted dark pill reads as a pill on black.
         font = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 84)
-        txt = f"#{n}"  # 2026-10-11: story numbers show as #1, #2, etc.
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42)
+        txt = f"{n}/{total}"
         bbox = d.textbbox((0, 0), txt, font=font)
         tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        d.text(((W_ - tw) / 2 - bbox[0], (H_ - th) / 2 - bbox[1]),
+        d.text(((CW - tw) / 2 - bbox[0], (CH - th) / 2 - bbox[1]),
                txt, font=font, fill=(255, 255, 255, 255))
         img.save(dest)
         return str(dest)
@@ -575,25 +679,28 @@ def main():
         except Exception:
             _pp = None
         if _pp is not None:
-            # 2026-10-16 LAYOUT GUARD (user: a single-character portrait
-            # shipped and took half the screen): the intro portrait MUST be
-            # a landscape group composition (one character per story, up to
-            # 5). A portrait-aspect pin scaled to PEOPLE_IMG_W wide covers
-            # half the frame and collides with the intro text. Fail loud so
-            # the worker regenerates it instead of shipping a broken intro.
+            # 2026-10-23 LAYOUT GUARD (user: portrait original, supersedes
+            # the 2026-10-16 landscape guard): the intro portrait MUST be
+            # a GROUP composition (one character per story, up to 5) in
+            # PORTRAIT (aspect <= 0.85) — the old landscape guard would
+            # now fail the correct pin. A single-character portrait is
+            # still a fail. Portrait pins are fitted by height here so
+            # they do not cover half the frame (the old landscape failure
+            # mode, in reverse).
             # (Deliberately OUTSIDE the try above — this error must NOT be
             # swallowed into a silent None.)
             _aspect = _pp.width / _pp.height
-            if _aspect < 1.25:
+            if _aspect > 0.85:
                 raise ValueError(
                     f"[render] FATAL: intro_people.png is {_pp.width}x"
                     f"{_pp.height} (aspect {_aspect:.2f}) — must be a "
-                    f"LANDSCAPE group portrait (aspect >= 1.25), one Pixar "
+                    f"PORTRAIT group portrait (aspect <= 0.85), one Pixar "
                     f"character per story. Regenerate it; refusing to "
                     f"render a broken intro layout.")
-            _s = PEOPLE_IMG_W / _pp.width
+            _target_h = 800
+            _s = _target_h / _pp.height
             people_img = _pp.resize(
-                (PEOPLE_IMG_W, int(_pp.height * _s)), Image.LANCZOS)
+                (int(_pp.width * _s), _target_h), Image.LANCZOS)
             # 2026-10-17 CENTERING (user: the group portrait should be
             # bigger and centered): center it on the frame's vertical
             # middle. Logos are laid out after this, so they sit above
@@ -864,7 +971,7 @@ def main():
           (right two-thirds). The panel is the caption track, so hooks
           show their narration (user 2026-10-13).
         Story shots carry the number badge top-right of the visual region;
-        hooks carry their number as an ASS pill instead.
+        hooks carry the same number pill as stories (segment badge).
         Two-up: a shot with two_up/path2 renders both visuals side by
         side inside the visual region (data contract for the worker:
         mark the script shot "two_up": true with a "broll2" query;
@@ -875,13 +982,26 @@ def main():
         is_branding = (v.get("seg_kind") == "hook"
                        and not seg.get("story_id")
                        and v.get("segment") != 0)
-        _analytics_map = {
-            # 2026-10-19: shot indices are per-run; rebuilt daily for the
-            # current script. Shot 20 = musk_tesla_agi seg2: AI-token
-            # 24h surge bars (TAO/VIRTUALS +7.4%, KITE +6.6%, ICP +6.4%,
-            # FET +4.7%) after Musk's Tesla-AGI post.
-            20: "analytics_ai_token_surge.mp4",
-        }
+        # 2026-10-20.6: NO hardcoded analytics map. A per-day map lived
+        # here and went stale every morning, overwriting the new script's
+        # shots with the previous day's graphics (2026-10-20 evening run:
+        # SpaceX giveaway math, hacker breach numbers, Nscale $90B bars and
+        # AEGIS thresholds all fired on unrelated new stories). Analytics
+        # now apply ONLY when the worker writes a per-run map for the
+        # current script at pipeline/output/analytics_map.json
+        # ({"<shot_index>": "<analytics_*.mp4>"}); no file = no override,
+        # and the planned visuals render untouched.
+        _analytics_map = {}
+        _amap_path = ROOT / "output" / "analytics_map.json"
+        if _amap_path.exists():
+            try:
+                import json as _json
+                _analytics_map = {int(k): v for k, v in
+                                  _json.loads(_amap_path.read_text()).items()}
+                print(f"[render] analytics map from {_amap_path.name}: "
+                      f"{_analytics_map}")
+            except Exception as e:
+                print(f"[render] WARNING: bad analytics_map.json: {e}")
         if i in _analytics_map:
             ap = ROOT / "cache" / "generated" / _analytics_map[i]
             if ap.exists():
@@ -1005,7 +1125,7 @@ def main():
                 # Badge top-right of the visual region (right edge at
                 # frame right, clear of the end-screen zone). The overlay
                 # is the unlabeled filtergraph output — ffmpeg auto-maps it.
-                fc += f";[stack][2:v]overlay={w-336}:80"
+                fc += f";[stack][2:v]overlay={w-291}:89"  # canvas centred on (w-198, 146)
                 inputs += ["-loop", "1", "-i", badge]
             else:
                 # No badge (hooks): map the labeled hstack output
@@ -1056,27 +1176,36 @@ def main():
             # The 9:16 code below is untouched.
             badge = None
             n = None
-            if v.get("seg_kind") == "story":
+            if v.get("seg_kind") in ("story", "hook"):
                 n = seg_number(v.get("segment"))
                 if n:
                     badge = seg_dir / f"badge_{n}.png"
-                    if not badge.exists():
-                        number_badge(n, badge)
+                    # Always regenerate (2026-10-23): a stale badge PNG
+                    # from an older format would otherwise survive.
+                    number_badge(n, badge)
                     badge = str(badge)
             render_landscape_shot(v, i, dur, seg, n, badge)
             _prev_badge_n = n if badge else None
             seg_files.append(out)
             continue
-        # Intro (2026-10-09): the cold-open hook gets a full-screen title
-        # card in huge type instead of b-roll — its text IS the visual.
-        # Branding hook ("link in bio"): the YouTube logo as its visual.
-        is_intro = (v.get("segment") == 0 and v.get("seg_kind") == "hook")
+        # Intro (2026-10-09, CUT 2026-10-23): the video now starts with
+        # the headline hooks — there is no cold-open segment any more.
+        # A segment is only an intro if it is a story-less hook whose
+        # text actually starts with "Breaking" (legacy scripts); the
+        # first story hook (segment 0 after the cut, WITH a story_id)
+        # must never be mistaken for it.
+        # Branding hook ("link in bio"): the self-plug Pixar montage.
+        is_intro = (v.get("seg_kind") == "hook"
+                    and not seg.get("story_id")
+                    and str(seg.get("text", "")).strip().lower()
+                    .startswith("breaking"))
         is_branding = (v.get("seg_kind") == "hook"
                        and not seg.get("story_id")
-                       and v.get("segment") != 0)
+                       and not is_intro)
         if is_intro:
-            # Animated word-by-word intro (2026-10-09) — regenerated every
-            # run since the cold-open line is written fresh daily.
+            # Animated word-by-word intro (2026-10-09, legacy only) —
+            # regenerated every run since the cold-open line is written
+            # fresh daily.
             anim = seg_dir / "intro_anim.mp4"
             seg0_end = timings[0]["start"] + timings[0]["duration"]
             iw = [ww for ww in words if ww["start"] < seg0_end]
@@ -1098,13 +1227,26 @@ def main():
         # terminal-style motion graphics instead of b-roll. Map is rebuilt
         # daily for the current script — stale indices play the WRONG
         # graphic (2026-10-10: genesis_pledges fired on the ICO shot).
-        _analytics_map = {
-            # 2026-10-19: shot indices are per-run; rebuilt daily for the
-            # current script. Shot 20 = musk_tesla_agi seg2: AI-token
-            # 24h surge bars (TAO/VIRTUALS +7.4%, KITE +6.6%, ICP +6.4%,
-            # FET +4.7%) after Musk's Tesla-AGI post.
-            20: "analytics_ai_token_surge.mp4",
-        }
+        # 2026-10-20.6: NO hardcoded analytics map. A per-day map lived
+        # here and went stale every morning, overwriting the new script's
+        # shots with the previous day's graphics (2026-10-20 evening run:
+        # SpaceX giveaway math, hacker breach numbers, Nscale $90B bars and
+        # AEGIS thresholds all fired on unrelated new stories). Analytics
+        # now apply ONLY when the worker writes a per-run map for the
+        # current script at pipeline/output/analytics_map.json
+        # ({"<shot_index>": "<analytics_*.mp4>"}); no file = no override,
+        # and the planned visuals render untouched.
+        _analytics_map = {}
+        _amap_path = ROOT / "output" / "analytics_map.json"
+        if _amap_path.exists():
+            try:
+                import json as _json
+                _analytics_map = {int(k): v for k, v in
+                                  _json.loads(_amap_path.read_text()).items()}
+                print(f"[render] analytics map from {_amap_path.name}: "
+                      f"{_analytics_map}")
+            except Exception as e:
+                print(f"[render] WARNING: bad analytics_map.json: {e}")
         if i in _analytics_map:
             ap = ROOT / "cache" / "generated" / _analytics_map[i]
             if ap.exists():
@@ -1118,27 +1260,30 @@ def main():
                 print(f"[render] shot {i}: analytical animation "
                       f"({_analytics_map[i]})")
         # Badge at middle-right of the top third (rule 12): every shot of
-        # a story's deep-dive segment carries the story number there.
+        # a story's deep-dive segment AND every headline hook carries the
+        # same story-number pill there (2026-10-23: unified pill).
         # Badge PNGs are generated once and reused across the shots.
+        # seg_number is None for story-less hooks (self-plug), so those
+        # correctly get no pill.
         badge = None
         n = None
-        if v.get("seg_kind") == "story":
+        if v.get("seg_kind") in ("story", "hook"):
             n = seg_number(v.get("segment"))
             if n:
                 badge = seg_dir / f"badge_{n}.png"
-                if not badge.exists():
-                    number_badge(n, badge)
+                # Always regenerate (2026-10-23): see landscape branch.
+                number_badge(n, badge)
                 badge = str(badge)
                 print(f"[render] shot {i}: story-number badge {n} "
                       f"middle-right of top third")
 
         # Number badge: story identifier at top-right, VERTICALLY CENTERED
-        # on the watermark (watermark at y=190, 34pt -> center ~212; badge
-        # 132px tall -> y=146). 2026-10-11 safe-area fix (motion-skills
-        # audit): badge right edge now sits at x=960, clear of TikTok's
-        # ~120px right-rail UI zone (was W-300, intruding 96px into it).
-        # The badge PNG already carries its dark pill, so it composites
-        # directly.
+        # on the watermark (watermark at y=190, 34pt -> center ~212).
+        # 2026-10-23: the 138x66 pill is centred on the old pill centre
+        # (W-198, 212), so the pill rect is W-267..W-129 x 179..245 and
+        # its canvas (186x114, with the blur margin) overlays at
+        # W-291:155. Right edge 951 sits clear of TikTok's 120px
+        # right-rail zone, so the QA sidecar can now be honest.
         def with_badge(base_vf, main_args, first_of_story=True):
             # 2026-10-11 motion upgrade (animation-principles): the badge
             # enters with a 0.4s ease-out grow (0.92 -> 1.0) + alpha fade —
@@ -1151,14 +1296,14 @@ def main():
             if first_of_story:
                 bvf = (f"{base_vf}[base];"
                        f"[1:v]format=rgba,"
-                       f"scale=w='276*(0.92+0.08*{_be})'"
-                       f":h='132*(0.92+0.08*{_be})':eval=frame,"
+                       f"scale=w='186*(0.92+0.08*{_be})'"
+                       f":h='114*(0.92+0.08*{_be})':eval=frame,"
                        f"fade=t=in:st=0:d=0.4:alpha=1[bg];"
-                       f"[base][bg]overlay=W-336:146")  # right edge at 1020
+                       f"[base][bg]overlay=W-291:155")  # canvas centred on (W-198, 212)
             else:
                 bvf = (f"{base_vf}[base];"
-                       f"[1:v]format=rgba,scale=276:132[bg];"
-                       f"[base][bg]overlay=W-336:146")  # right edge at 1020
+                       f"[1:v]format=rgba,scale=186:114[bg];"
+                       f"[base][bg]overlay=W-291:155")  # canvas centred on (W-198, 212)
             return (["ffmpeg", "-y"] + main_args +
                     ["-loop", "1", "-i", badge,
                      "-t", f"{dur:.2f}", "-filter_complex", bvf])
@@ -1171,21 +1316,59 @@ def main():
                 # intro_video — fade misbehaves on concat-demuxer timestamps).
                 vf += ",fade=t=in:st=0:d=0.8"
             else:
-                # Stock clips fit inside the shot region over black —
-                # background is always black; no Ken Burns on clips.
-                # Vertically CENTERED in the region (2026-10-09 fix: the old
-                # pad pinned clips at y=TOP_PAD, leaving them floating high
-                # with black below).
+                # 2026-10-23 portrait-fill (user): clips that are close
+                # to 9:16 cover-fill the frame; everything else gets a
+                # blurred background from its own colours (same rule as
+                # frame_layout for photos) with the sharp clip fit inside
+                # the visual zone (y 0..1400). No black bars.
                 # Analytical animations (2026-10-10): MUST sit below the
                 # watermark/badge (badge bottom y=278) — pad y=290, no overlap
-                # with badge, watermark, or captions.
+                # with badge, watermark, or captions; they keep the old path.
                 _is_analytics = "analytics_" in v["path"]
-                _pad_y = ("290" if _is_analytics
-                            else r"min(960-ih/2\,1400-ih)")  # never touch captions
-                vf = (f"format=rgb24,"
-                      f"scale={w}:{REGION_H}:force_original_aspect_ratio=decrease,"
-                      f"pad={w}:{h}:(ow-iw)/2:{_pad_y}:0x000000,"
-                      f"fps={fps},setsar=1")
+                if _is_analytics:
+                    vf = (f"format=rgb24,"
+                          f"scale={w}:{REGION_H}:force_original_aspect_ratio=decrease,"
+                          f"pad={w}:{h}:(ow-iw)/2:290:0x000000,"
+                          f"fps={fps},setsar=1")
+                else:
+                    _cw, _ch = 0, 0
+                    try:
+                        _pr = subprocess.run(
+                            ["ffprobe", "-v", "quiet", "-select_streams",
+                             "v:0", "-show_entries", "stream=width,height",
+                             "-of", "csv=p=0", v["path"]],
+                            capture_output=True, text=True, check=True)
+                        _cw, _ch = [int(x) for x in
+                                    _pr.stdout.strip().split(",")[:2]]
+                    except Exception:
+                        pass
+                    _ta = w / h
+                    _sa = (_cw / _ch) if _cw and _ch else 0
+                    _loss = (1.0 - _ta / _sa) if _sa >= _ta else \
+                        (1.0 - _sa / _ta) if _sa else 1.0
+                    # 2026-10-23 (frame-review fix): the self-plug clip
+                    # must NEVER cover-fill. Its 1080x1400 canvas is
+                    # designed to sit in the visual zone above the
+                    # captions; cover-filling it to 1080x1920 stretches
+                    # it to full height and pushes its bottom row
+                    # under the caption black area. Force the blur-pad
+                    # path for selfplug clips, so the group stays in
+                    # y 0..1400 and fully visible above the captions.
+                    if _sa and _loss <= 0.30 and "selfplug_" not in v["path"]:
+                        vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+                              f"crop={w}:{h},fps={fps},setsar=1")
+                    else:
+                        # Blur-pad: background is the clip itself, scaled
+                        # down, blurred, scaled back up (cheaper than a
+                        # full-res blur per frame) and darkened; the sharp
+                        # clip sits centred in the visual zone on top.
+                        vf = (f"split[bs][fs];"
+                              f"[bs]scale=540:960:force_original_aspect_ratio=increase,"
+                              f"crop=540:960,gblur=sigma=20,scale={w}:{h},"
+                              f"eq=brightness=-0.18[bg0];"
+                              f"[fs]scale={w}:1400:force_original_aspect_ratio=decrease"
+                              f"[fg0];[bg0][fg0]overlay=(W-w)/2:(1400-h)/2,"
+                              f"fps={fps},setsar=1")
             # Analytical/self-plug clips (2026-10-10): play ONCE then HOLD the
             # last frame — never loop (the loop restart was the ugly cut at
             # 1:33). Stock clips still loop to fill. tpad runs in RGB (before
@@ -1226,7 +1409,9 @@ def main():
                        "-crf", "23", str(out)])
         else:  # photo / title card -> terminal layout, then elastic zoom-out
             src = frame_layout(v["path"], w * 2, h * 2,
-                               seg_dir / f"shot_{i:02d}_bg.jpg")
+                               seg_dir / f"shot_{i:02d}_bg.jpg",
+                               doc=bool(v.get("doc")),
+                               person=bool(v.get("person")))
             frames = max(1, int(dur * fps))
             # Elastic zoom-OUT only, QUICK (2026-10-09): the zoom completes
             # in the first ~1.5s with one snappy elastic overshoot, then
@@ -1286,6 +1471,50 @@ def main():
     music_dir = ROOT / "assets" / "music"
     tracks = sorted(music_dir.glob("*.mp3")) if music_dir.exists() else []
     music = random.choice(tracks) if tracks else None
+
+    # 2026-10-23 caption background (user): terminal captions stay, but
+    # their area gets a PURE BLACK background whose top edge fades
+    # (soft gradient, no solid line) instead of the old floating text
+    # over whatever the shot happened to show. This matters now that
+    # shots fill the frame (item 2) — without it, a full-bleed shot
+    # would bleed under the captions. The gradient is composited in
+    # Pass 2 itself (overlay first, then ASS captions on top) — NOT as
+    # a separate pre-pass encode: a pre-pass double-encodes the whole
+    # video (2026-10-23: the pre-pass was still running at 30+ min when
+    # a service restart killed it, with the final encode still to come).
+    # Landscape keeps its terminal panel (no gradient).
+    grad_path = None
+    if not LANDSCAPE:
+        try:
+            grad_path = caption_gradient_png(
+                ROOT / "output" / "caption_gradient.png")
+        except Exception as e:
+            print(f"[render] WARNING: caption gradient failed ({e}) — "
+                  f"continuing without it")
+
+    # MUSIC OFF (2026-10-23, user, temporary): the bed track is
+    # preserved as assets/music/ai_digest_bed.mp3.disabled, so no
+    # *.mp3 track exists and no bed is mixed until the user asks again.
+    # 2026-10-23 beat-synced music bed (user, via beats.py): when a music
+    # track exists, align its loop to whole beats (first beat at the
+    # bed start, loop length = a whole number of beats) instead of
+    # looping a raw mp3 that can cut mid-beat. Falls back silently to
+    # the old raw loop if beat detection fails; no music = no bed.
+    if music:
+        try:
+            from beats import beat_aligned_bed
+            _ndur = float(subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries",
+                 "format=duration", "-of", "csv=p=0", str(narration)],
+                capture_output=True, text=True).stdout.strip() or 60)
+            _bed = beat_aligned_bed(str(music), _ndur,
+                                    ROOT / "output" / "music_bed.wav")
+            if _bed:
+                music = Path(_bed)
+                print(f"[render] music bed beat-aligned -> {music.name}")
+        except Exception as e:
+            print(f"[render] WARNING: beat alignment failed ({e}) — "
+                  f"using raw music loop")
 
     inputs = ["-i", str(vcat), "-i", str(narration)]
     if music:
@@ -1384,7 +1613,8 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Emphasis,Arial,76,&H00FFFFFF,&H00000000,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,3,8,0,5,60,60,60,1
-Style: HookNum,Arial,132,&H00FFFFFF,&H00000000,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,3,14,0,5,60,60,133,1
+# (HookNum style retired 2026-10-23: hooks now carry the same PNG pill
+# as stories, composited in the segment stage — no ASS number pill.)
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -1401,50 +1631,35 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         # layout, not an overlay.
         overlay_geoms = [
             {"name": "story_badge",
-             "rect": [w - 336, 80, w - 336 + 276, 80 + 132]},
+             "rect": [w - 267, 113, w - 129, 179]},
             {"name": "watermark", "rect": [VIS_X + 40, 80, VIS_X + 280, 118]},
             {"name": "hook_num_pill",
-             "rect": [w - 198 - 40, 146 - 70, w - 198 + 40, 146 + 70]},
+             "rect": [w - 267, 113, w - 129, 179]},
         ]
     else:
         overlay_geoms = [
             {"name": "story_badge",
-             "rect": [w - 396, 146, w - 396 + 276, 278]},
+             "rect": [w - 267, 179, w - 129, 245]},
             {"name": "watermark", "rect": [60, 190, 300, 228]},
             {"name": "hook_num_pill",
-             # single 132pt digit centered on the badge (badge center x =
-             # w-396+138 = w-258): ~80px wide, ~140px tall
-             "rect": [w - 258 - 40, 212 - 70, w - 258 + 40, 212 + 70]},
+             # Unified pill (2026-10-23): same rect as the story badge.
+             "rect": [w - 267, 179, w - 129, 245]},
             {"name": "captions", "anchor": [60, 1450]},
         ]
-    # Hook pill x = badge center x, so the number never jumps between the
-    # hooks and the deep-dives (2026-10-11: the safe-area move shifted the
-    # badge left but the pill stayed behind — root cause of the jump).
-    pill_x = w - 198  # 2026-10-11: matches badge center (W-336+138)
-    # Landscape: badge sits at y=80, so the pill centers at y=146.
-    pill_y = 146 if LANDSCAPE else 212
     story_ids = {str(sid).lower().replace("-", " ").replace("_", " ")
                  for sid in script.get("story_ids", [])}
     for si, seg in enumerate(script["segments"]):
-        # Rule 12: story hooks get a numbered pill (1..5) at top-right —
-        # matching the story-number badge position. The number is the thread
-        # linking hook to story. It replaces any punch label on hooks;
-        # story segments keep theirs.
-        n = story_num.get(str(seg.get("story_id") or ""))
-        if seg.get("kind") == "hook" and n and si < len(timings):
-            tm = timings[si]
-            seg_start, seg_end = tm["start"], tm["start"] + tm["duration"]
-            estart = seg_start + 0.15
-            eend = max(estart + 0.5, seg_end - 0.15)
-            emph_events.append(
-                f"Dialogue: 0,{_ts(estart)},{_ts(eend)},HookNum,,0,0,0,,"
-                f"{{\\fad(300,250)\\pos({pill_x},{pill_y})}}#{n}")
-            print(f"[render] hook {si}: numbered pill {n} at top-right")
+        # Rule 12 (unified 2026-10-23): story hooks carry the same PNG
+        # number pill as their deep-dive, composited in the segment
+        # stage -- NOT an ASS event here, which used to look different
+        # (#n, tight black box) and would double up with the badge.
+        # Hooks get no emphasis pill.
+        if seg.get("kind") == "hook":
             continue
         if LANDSCAPE:
             # Landscape (2026-10-13): story emphasis pills are skipped —
             # the terminal panel already shows the narration as it's
-            # spoken. Hook number pills (above) are kept.
+            # spoken. Hook number pills are the segment badge now.
             continue
         emph = (seg.get("emphasis") or "").strip()
         # Guard: emphasis must be a human punch label ("ROGUE AGENTS",
@@ -1550,15 +1765,35 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         epath.write_text(emph_header + "\n".join(emph_events) + "\n")
         vf_parts.append(f"ass={epath}")
         print(f"[render] {len(emph_events)} emphasis pills (timed + face-aware)")
-    run(["ffmpeg", "-y", *inputs,
-         "-filter_complex", afilter,
-         "-vf", ",".join(vf_parts),
-         "-map", "0:v", "-map", amap,
-         "-c:v", "libx264", "-pix_fmt", "yuv420p",
-         "-profile:v", "high", "-level", "4.0",
-         "-preset", preset, "-crf", str(crf),
-         "-r", str(fps), "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
-         "-shortest", "-movflags", "+faststart", str(final)])
+    if grad_path and not LANDSCAPE:
+        # Gradient in the SAME encode as captions: video chain is
+        # overlay (black fade at y=1380) -> tpad -> ASS captions ->
+        # watermark -> emphasis ASS, all in one filter_complex with the
+        # audio filter. Gradient input index = 2 without music, 3 with.
+        gidx = 3 if music else 2
+        vchain = (f"[0:v][{gidx}:v]overlay=0:1380:format=yuv420,"
+                  f"format=yuv420p")
+        if vf_parts:
+            vchain += "," + ",".join(vf_parts)
+        vchain += "[vout]"
+        run(["ffmpeg", "-y", *inputs, "-loop", "1", "-i", str(grad_path),
+             "-filter_complex", f"{vchain};{afilter}",
+             "-map", "[vout]", "-map", amap,
+             "-c:v", "libx264", "-pix_fmt", "yuv420p",
+             "-profile:v", "high", "-level", "4.0",
+             "-preset", preset, "-crf", str(crf),
+             "-r", str(fps), "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+             "-shortest", "-movflags", "+faststart", str(final)])
+    else:
+        run(["ffmpeg", "-y", *inputs,
+             "-filter_complex", afilter,
+             "-vf", ",".join(vf_parts),
+             "-map", "0:v", "-map", amap,
+             "-c:v", "libx264", "-pix_fmt", "yuv420p",
+             "-profile:v", "high", "-level", "4.0",
+             "-preset", preset, "-crf", str(crf),
+             "-r", str(fps), "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+             "-shortest", "-movflags", "+faststart", str(final)])
     print(f"[render] done -> {final}")
     # Overlay geometry sidecar for QA safe-area checks.
     (ROOT / "output" / "overlays.json").write_text(json.dumps(
