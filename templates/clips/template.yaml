@@ -1,0 +1,64 @@
+# Clips — NEW template (draft, 2026-10-24)
+# Status: draft, not yet used by any run. Single-story short clips in the
+# same terminal style as Daily Digest, but built for one story at a time —
+# standalone, or cut down from a Daily Digest story segment.
+# Confirm/adjust the draft parameters below before wiring this in.
+id: clips
+name: Clips
+is_main: false
+based_on: daily-digest  # same style, different structure and length
+
+format:
+  width: 1080
+  height: 1920
+  aspect: "9:16"
+  fps: 30
+  codec: h264
+  profile: high
+  level: 4.0
+  pix_fmt: yuv420p
+  faststart: true
+  loudness_lufs: -14
+
+content:
+  stories: 1
+  structure:
+    - hook: 1 punchy headline sentence with the payoff baked in, kind=hook, with story_id
+    - deep_dive: 1 segment, kind=story, 3-4 distinct facts, never restating the headline
+    - branding: short end line, kind=hook, no story_id
+      text: "Follow to stay ahead, the full digest is at the link in bio"
+  words_total: [90, 130]
+  reading_level_max: 9.5  # Flesch-Kincaid, same gate as Daily Digest
+  duration_target_seconds: [30, 60]
+
+style:
+  captions:
+    style: terminal per-letter typewriter, trailing block cursor
+    color: "#39FF14"
+    background: pure black
+    fade: 70px smoothstep at y 1380..1450
+    text_top_y: 1450
+  number_pills: none  # single story, no x/5 numbering
+  hero: same rule as Daily Digest — most relevant source footage, person photo only as fallback
+  self_plug_montage: none  # no 5-character montage in a short clip
+  end_pair:
+    type: single character+logo pair, left character / right company or icon logo
+    source: that story's character and logo from script.json story_people / story_icons
+  portrait: none  # no group portrait; use the story's single person photo / character
+  voice:
+    engine: Kokoro
+    voice: am_echo
+    speed: 1.10
+  music: off  # same as Daily Digest for now
+
+visual_rules:
+  - same as Daily Digest: verified pins first, vision-cropped document/X shots, no Commons, stock illustrative only, literal broll, no repeats, no black frames, no generic listing screenshots, no verification/paywall walls, no full-frame logos in the deep dive
+  - evidence cannot appear before its subject is spoken; visual changes align with narration
+
+publish:
+  mode: telegram_queue
+  tiktok_description:
+    format: "Here is one of the biggest AI stories for {Day, Month Date with ordinal}: [story clause]. [1 engagement question hooked on the story]\n[exactly 5 hashtags as the FINAL line]"
+    never_claim_to_be_ai: true
+    sent_to_telegram_with_video: true
+  dedupe: never repeat stories already shared (pipeline/state.json posted_ids), unless explicitly cutting a story already in that day's Daily Digest
