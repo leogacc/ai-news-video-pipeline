@@ -1308,6 +1308,171 @@ def deepseek_api_price(dur=6.0):
     return dest
 
 
+
+
+def spacex_giveaway_math(dur=6.0):
+    """Musk's SpaceX share pledge: 73M kids x $146 = ~$10.7B. Counters."""
+    dest = GEN_DIR / "analytics_spacex_giveaway_math.mp4"
+    f_title = _font(56)
+    f_label = _font(42)
+    f_num = _font(64)
+    f_big = _font(110)
+
+    def frames(n):
+        for i in range(n):
+            t = i / FPS
+            img = Image.new("RGB", (W, H), (0, 0, 0))
+            d = ImageDraw.Draw(img)
+            title = "DOING THE MATH"
+            k = int(min(len(title), t / 0.8 * len(title)))
+            d.text((80, 60), title[:k], font=f_title, fill=NEON)
+            # kids counter
+            if t > 0.7:
+                p = _ease_out_cubic(min(1.0, (t - 0.7) / 1.4))
+                d.text((80, 230), "KIDS UNDER 18", font=f_label, fill=GRAY)
+                d.text((80, 290), f"{int(73000000 * p):,}", font=f_num, fill=NEON)
+            # price
+            if t > 1.6:
+                p = _ease_out_cubic(min(1.0, (t - 1.6) / 1.2))
+                d.text((80, 450), "PRICE PER SHARE", font=f_label, fill=GRAY)
+                d.text((80, 510), f"${int(146 * p)}", font=f_num, fill=NEON)
+            # total
+            if t > 2.8:
+                p = _ease_out_cubic(min(1.0, (t - 2.8) / 1.8))
+                d.text((80, 700), "THE GIVEAWAY", font=f_label, fill=GRAY)
+                d.text((80, 770), f"${10.7 * p:.1f}B", font=f_big, fill=NEON)
+            if t > 4.6:
+                d.text((80, 950), "DELIVERY PLAN: NONE YET", font=f_label, fill=RED)
+            yield img
+
+    _write(frames, int(dur * FPS), dest)
+    return dest
+
+
+def hacker_agent_numbers(dur=6.0):
+    """Hacker AI-agent breach stats: 1200 probed, 23h each, 100+ hit, $5k."""
+    dest = GEN_DIR / "analytics_hacker_agent_numbers.mp4"
+    f_title = _font(56)
+    f_label = _font(40)
+    f_num = _font(60)
+    f_big = _font(96)
+    rows = [
+        ("SITES PROBED", 1200, "{:,}"),
+        ("HOURS PER BREACH", 23, "{:,}"),
+        ("SITES BREACHED", 100, "{}+"),
+        ("TOKEN COST", 5000, "${:,}"),
+    ]
+
+    def frames(n):
+        for i in range(n):
+            t = i / FPS
+            img = Image.new("RGB", (W, H), (0, 0, 0))
+            d = ImageDraw.Draw(img)
+            title = "ONE HACKER, AI AGENTS"
+            k = int(min(len(title), t / 0.8 * len(title)))
+            d.text((80, 60), title[:k], font=f_title, fill=NEON)
+            y0 = 210
+            for ri, (label, val, fmt) in enumerate(rows):
+                rt = t - 0.7 - ri * 0.6
+                if rt <= 0:
+                    continue
+                p = _ease_out_cubic(min(1.0, rt / 1.0))
+                y = y0 + ri * 150
+                d.text((80, y), label, font=f_label, fill=GRAY)
+                txt = fmt.format(int(val * p))
+                d.text((80, y + 52), txt, font=f_num, fill=NEON)
+            if t > 3.4:
+                p = _ease_out_cubic(min(1.0, (t - 3.4) / 1.0))
+                d.text((80, 840), "COST PER BREACH", font=f_label, fill=GRAY)
+                d.text((80, 900), f"${int(50 * p)}", font=f_big, fill=NEON)
+            yield img
+
+    _write(frames, int(dur * FPS), dest)
+    return dest
+
+
+def nscale_ninety_billion(dur=6.0):
+    """Anthropic x Nscale: $45B + $45B = $90B. Animated bars + total."""
+    dest = GEN_DIR / "analytics_nscale_ninety_billion.mp4"
+    f_title = _font(56)
+    f_label = _font(42)
+    f_num = _font(56)
+    f_big = _font(110)
+    bars = [("AUG DEAL", 45), ("NEW DEAL", 45)]
+
+    def frames(n):
+        for i in range(n):
+            t = i / FPS
+            img = Image.new("RGB", (W, H), (0, 0, 0))
+            d = ImageDraw.Draw(img)
+            title = "ANTHROPIC'S COMPUTE BILL"
+            k = int(min(len(title), t / 0.8 * len(title)))
+            d.text((80, 60), title[:k], font=f_title, fill=NEON)
+            y0 = 240
+            for bi, (name, val) in enumerate(bars):
+                bt = t - 0.7 - bi * 0.8
+                if bt <= 0:
+                    continue
+                d.text((80, y0 + bi * 200), name, font=f_label, fill=GRAY)
+                bw = int(700 * _ease(bt / 0.9))
+                d.rectangle([80, y0 + bi * 200 + 62, 780, y0 + bi * 200 + 108],
+                            fill=(8, 24, 8))
+                if bw > 0:
+                    d.rectangle([80, y0 + bi * 200 + 62, 80 + bw,
+                                 y0 + bi * 200 + 108], fill=NEON)
+                ne = _ease_out_cubic(min(1.0, bt / 0.9))
+                d.text((810, y0 + bi * 200 + 52), f"${int(val * ne)}B",
+                       font=f_num, fill=NEON)
+            if t > 2.8:
+                p = _ease_out_cubic(min(1.0, (t - 2.8) / 1.6))
+                d.text((80, 720), "COMBINED", font=f_label, fill=GRAY)
+                d.text((80, 790), f"${int(90 * p)}B", font=f_big, fill=NEON)
+            if t > 4.6:
+                d.text((80, 960), "ONE CAMPUS, WEST VIRGINIA", font=f_label,
+                       fill=GRAY)
+            yield img
+
+    _write(frames, int(dur * FPS), dest)
+    return dest
+
+
+def aegis_thresholds(dur=6.0):
+    """AEGIS Act pause thresholds: 50+ deaths/serious injuries or $1B damage."""
+    dest = GEN_DIR / "analytics_aegis_thresholds.mp4"
+    f_title = _font(56)
+    f_label = _font(42)
+    f_num = _font(72)
+    f_big = _font(100)
+
+    def frames(n):
+        for i in range(n):
+            t = i / FPS
+            img = Image.new("RGB", (W, H), (0, 0, 0))
+            d = ImageDraw.Draw(img)
+            title = "PAUSE ONLY IF"
+            k = int(min(len(title), t / 0.8 * len(title)))
+            d.text((80, 60), title[:k], font=f_title, fill=NEON)
+            if t > 0.7:
+                p = _ease_out_cubic(min(1.0, (t - 0.7) / 1.2))
+                d.text((80, 230), "DEATHS OR SERIOUS INJURY", font=f_label,
+                       fill=GRAY)
+                d.text((80, 300), f"{int(50 * p)}+", font=f_big, fill=RED)
+            if t > 1.9:
+                p = _ease_out_cubic(min(1.0, (t - 1.9) / 1.2))
+                d.text((80, 500), "OR DAMAGE", font=f_label, fill=GRAY)
+                d.text((80, 570), f"${p:.1f}B", font=f_big, fill=RED)
+            if t > 3.2:
+                d.text((80, 780), "FROM A SINGLE INCIDENT", font=f_label,
+                       fill=GRAY)
+            if t > 4.0:
+                d.text((80, 900), "COMMERCE ASKS, COURT ORDERS", font=f_label,
+                       fill=NEON)
+            yield img
+
+    _write(frames, int(dur * FPS), dest)
+    return dest
+
+
 if __name__ == "__main__":
     genesis_pledges()
     revenue_selloff()
@@ -1328,6 +1493,10 @@ if __name__ == "__main__":
     deepseek_deepswe_bars()
     rtx_spark_memory()
     deepseek_api_price()
+    spacex_giveaway_math()
+    hacker_agent_numbers()
+    nscale_ninety_billion()
+    aegis_thresholds()
 
 
 def ai_token_surge(dur=6.0):
