@@ -321,7 +321,8 @@ def _render_html_card(tweet_url: str, out_path: Path) -> Path:
     if not t.get("text"):
         raise ValueError("no tweet text from any source")
     page = _build_html(t)
-    html_path = out_path.with_suffix(".html")
+    html_path = out_path.with_suffix(".html").resolve()
+    out_path = out_path.resolve()
     html_path.write_text(page, encoding="utf-8")
     cmd = [NODE, str(RENDER_MJS), str(html_path), "#tweet-card",
            str(out_path), "1080"]
