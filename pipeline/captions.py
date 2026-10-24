@@ -135,9 +135,19 @@ def main():
     if not words:
         raise RuntimeError("[captions] words.json is empty")
     # The intro types its own text full-screen — no caption cards under it.
+    # 2026-10-23 (intro cut): the video now starts with the hooks, so
+    # there is usually NO intro at all. Only suppress captions when the
+    # first segment actually is a cold-open (story-less hook starting
+    # with "Breaking"); otherwise intro_end stays 0 and every hook gets
+    # its normal terminal captions.
     timings = json.loads((ROOT / "output" / "timings.json").read_text())
+    _script = json.loads((ROOT / "output" / "script.json").read_text())
+    _first = _script.get("segments", [{}])[0] if _script.get("segments") else {}
+    _is_intro = (not _first.get("story_id")
+                 and str(_first.get("text", "")).strip().lower()
+                 .startswith("breaking"))
     intro_end = (timings[0]["start"] + timings[0]["duration"]
-                 if timings else 0)
+                 if timings and _is_intro else 0)
 
     # Group into typed phrases: break at sentence end, or when a phrase
     # would exceed ~2.8s / 12 words — same cadence as the old cards.
