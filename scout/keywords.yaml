@@ -1,0 +1,253 @@
+# Scout master keyword list — search for everything AI (runs on X AND on Threads from 2026-10-26)
+# Created 2026-10-24, user: "stay general in the AI space" (not hacks).
+# This list is the scout's search pool. The scout SAVES what it finds to
+# scout/saved_items.json, and ALL downstream pipelines (daily digest,
+# clips, rumors digest) retrieve their data from that saved pool first,
+# before doing any of their own searching.
+#
+# How to use it:
+# - Run the combined search_queries below (one per search), plus the
+#   account list in scout/accounts.yaml, each scout run — on X, and
+#   from 2026-10-26 also on Threads via threads-cli search (see
+#   scout/README.md "How Threads is accessed").
+# - Search the last 24h first, then widen only if a run comes back empty.
+# - A keyword hit is NOT a story by itself — it must be a notable post
+#   (new model, launch, paper, demo, tool, company move, or credible
+#   rumor) with a source post + date + author. Skip hype, memes, and
+#   engagement bait, and log why in the run report.
+# - Do NOT use hack-specific terms (jailbreak, unlock, crack, bypass) as
+#   primary search terms. If a general find happens to be an unlock or
+#   workaround, classify it as a FIND, label its benchmarks as claimed
+#   by its author, and do not call the category Hacks.
+
+categories:
+  - releases   # official announcements: launches, models, products, papers from the lab/company itself
+  - rumors     # unconfirmed: leaks, reportedly, sources say, upcoming — always labelled as rumor
+  - finds      # GENERAL AI finds: community tools, demos, projects, research, benchmarks, clever uses — not official releases, not rumors, not hacks as a category
+
+keyword_groups:
+  core_ai:
+    - AI
+    - artificial intelligence
+    - machine learning
+    - deep learning
+    - neural network
+    - LLM
+    - large language model
+    - SLM
+    - small language model
+    - generative AI
+    - GenAI
+    - AGI
+    - superintelligence
+    - foundation model
+    - AI agent
+    - agentic AI
+    - autonomous agent
+    - multi-agent
+    - reasoning model
+    - world model
+
+  release_signals:
+    - new model
+    - model release
+    - just released
+    - just launched
+    - launching
+    - unveiled
+    - announced
+    - announcing
+    - announces
+    - now available
+    - now live
+    - open source
+    - open weights
+    - open-source model
+    - checkpoint
+    - preview
+    - beta
+    - waitlist
+    - early access
+    - API release
+    - new API
+
+  labs_and_companies:
+    - OpenAI
+    - ChatGPT
+    - GPT
+    - Anthropic
+    - Claude
+    - Google DeepMind
+    - Gemini
+    - Meta AI
+    - Llama
+    - xAI
+    - Grok
+    - Microsoft Copilot
+    - NVIDIA
+    - Mistral
+    - DeepSeek
+    - Qwen
+    - Alibaba AI
+    - Cohere
+    - Stability AI
+    - Midjourney
+    - Runway
+    - Sora
+    - Block
+    - Dessa
+
+  modalities_and_capabilities:
+    - text to video
+    - video generation
+    - image generation
+    - text to image
+    - voice AI
+    - speech model
+    - full-duplex
+    - text to speech
+    - speech to speech
+    - robotics
+    - humanoid robot
+    - embodied AI
+    - autonomous driving
+    - self-driving
+    - coding agent
+    - code generation
+    - vibe coding
+    - computer use
+    - browser agent
+    - search agent
+    - multimodal
+    - vision model
+    - audio model
+
+  research_and_tech:
+    - arXiv
+    - paper
+    - research paper
+    - breakthrough
+    - SOTA
+    - state of the art
+    - benchmark
+    - discovery
+    - discoveries
+    - theorem
+    - evaluation
+    - scaling law
+    - training
+    - inference
+    - GPU
+    - AI chip
+    - accelerator
+    - quantization
+    - distillation
+    - fine-tuning
+    - reinforcement learning
+    - RLHF
+    - diffusion
+    - transformer
+    - mixture of experts
+    - MoE
+    - context window
+    - token
+    - latency
+    - TFLOPS
+    - PyTorch
+    - vLLM
+    - Tensor Core
+    - FP16
+    - BF16
+    - FP32
+    - CUDA
+    - RTX
+    - Ampere
+    - local inference
+    - local LLM
+
+  industry_and_impact:
+    - AI safety
+    - alignment
+    - AI regulation
+    - AI policy
+    - copyright
+    - AI lawsuit
+    - AI funding
+    - AI acquisition
+    - AI startup
+    - AI bubble
+    - AI valuation
+    - IPO
+    - data center
+    - AI energy
+    - AI jobs
+    - AI layoffs
+
+  finds_signals:
+    - new tool
+    - AI tool
+    - just built
+    - I built
+    - demo
+    - showcase
+    - project
+    - workflow
+    - prompt
+    - MCP
+    - plugin
+    - extension
+    - app
+    - GitHub
+    - open source project
+    - tutorial
+    - benchmark results
+
+  rumor_signals:
+    - leak
+    - leaked
+    - reportedly
+    - sources say
+    - rumor
+    - rumoured
+    - upcoming
+    - in development
+    - exclusive
+    - scoop
+    - internal
+
+# Combined X search queries — run these, not every keyword alone.
+# "AI" alone is too noisy; pair a core term with a signal term.
+search_queries:
+  - "(AI OR LLM OR artificial intelligence) (new model OR model release OR just released OR unveiled OR announced)"
+  - "(OpenAI OR Anthropic OR Claude OR Gemini OR DeepMind OR xAI OR Grok OR Meta AI OR DeepSeek OR Qwen OR Mistral) (launch OR release OR model OR announcement OR announcing)"
+  - "(AI agent OR agentic OR autonomous agent OR coding agent OR computer use) (launch OR demo OR tool OR release)"
+  - "(video generation OR image generation OR voice AI OR speech model OR robotics OR humanoid) (new OR launch OR demo OR model)"
+  - "(arXiv OR paper OR research OR breakthrough OR benchmark OR SOTA) (AI OR LLM OR model)"
+  - "(open source OR GitHub OR open weights) (AI OR LLM OR model OR tool)"
+  - "(AI OR LLM) (funding OR acquisition OR startup OR IPO OR lawsuit OR regulation OR safety)"
+  - "(AI OR LLM) (leak OR leaked OR reportedly OR rumor OR upcoming OR exclusive)"
+  - "(GPU OR AI chip OR inference OR training) (AI OR NVIDIA OR model)"
+  - "(AI tool OR new tool OR just built OR demo OR showcase) (AI OR LLM)"
+  - "(TFLOPS OR PyTorch OR vLLM OR Tensor Core OR FP16 OR BF16) (GPU OR NVIDIA OR RTX OR AI)"
+  # Added 2026-10-26 (user: "add a market-moving AI news query"): AI market
+  # moves — bubbles, crashes, selloffs. This is AI market NEWS, not
+  # stock-price tips, so it sits outside the excluded_as_primary
+  # "stock price" noise rule below.
+  - "(AI OR semiconductor) (bubble OR burst OR crash OR plunge OR meltdown OR selloff) (stocks OR market OR index)"
+  # Added 2026-10-26 (user: "add more keywords", after the scout missed
+  # Greg Brockman's Oct 26 OpenAI science-discoveries post): the old
+  # queries only matched model/tool/release/paper vocabulary, so an
+  # announcement worded as "Announcing ... discoveries" fell through.
+  - "(AI OR LLM OR OpenAI OR Anthropic OR DeepMind OR Meta AI OR xAI) (discovery OR discoveries OR theorem OR proof OR scientific)"
+  - "(AI OR LLM) (discovers OR discovered OR solves OR solved OR proves OR proved)"
+
+# What NOT to search as primary terms (noise / out of scope):
+excluded_as_primary:
+  - jailbreak
+  - unlock
+  - crack
+  - bypass
+  - crypto
+  - stock price
+  - meme
+  - giveaway
