@@ -91,6 +91,36 @@ def main():
         check("no black-frame shots", not black,
               f"(shots {black} — pin a real visual)" if black else "")
 
+    # Edge-slice guard (2026-10-27, v2026.10.27.2): an article-card pin
+    # cropped through its own headline ships a sliced title — the 20:48
+    # cut carried the same sliced PYMNTS headline TWICE (hook hero +
+    # deep-dive pin) because no check ever looked at pin edges. The
+    # wall scans reject verification/paywall/adblock walls, not a clean
+    # card with a tight crop, so this is its own gate. FAILS LOUDLY
+    # naming the offender pins.
+    if vjs.exists():
+        sys.path.insert(0, str(ROOT))
+        from pin_edge_check import check_visuals as _edge_check
+        vs = json.loads(vjs.read_text())
+        offenders = _edge_check(vs)
+        check("no edge-sliced text in pins", not offenders,
+              f"({offenders} — re-crop with whitespace beyond the "
+              f"outermost text line)" if offenders else "")
+
+    # Hero-aspect guard (2026-10-27, v2026.10.27.4): a hook-hero pin
+    # wider than 1.5:1 renders as a short centred band with a large
+    # blurred stretch between the content and the pinned captions —
+    # the 21:14 cut's Opera hero (1600x800) filled only 540px of the
+    # 1490px visual zone. FAILS LOUDLY naming the offender pins.
+    if vjs.exists():
+        sys.path.insert(0, str(ROOT))
+        from pin_edge_check import check_hero_aspect as _hero_aspect
+        vs = json.loads(vjs.read_text())
+        wide = _hero_aspect(vs)
+        check("no wide hook-hero pins", not wide,
+              f"({wide} — re-crop to the informative region or extend "
+              f"the crop to portrait)" if wide else "")
+
     # Shot timing sanity (2026-10-09): shots must be chronological and
     # non-overlapping — a match_shot regression once collapsed two shots
     # onto the same start and silently de-synced the visuals.
