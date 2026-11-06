@@ -1,0 +1,69 @@
+# X scout accounts — FILL THIS IN BEFORE ENABLING THE SCOUT CRON
+# The scout worker must ONLY scout accounts listed here. It must NEVER
+# guess accounts, and if this list is empty it must report "scout not
+# configured" and stop, without publishing anything.
+#
+# Format per account:
+#   - handle: OpenAI
+#     role: releases_and_rumors  # releases | rumors | releases_and_rumors
+#     notes: official company account
+#
+# Roles:
+#   releases — official announcements, product/model launches, company posts
+#   rumors — leakers / reporters who post unconfirmed AI news
+#   releases_and_rumors — account that does both
+#
+# X account for scouting:
+#   handle: ""  # the user's X account, if logged-in scouting is used; otherwise public scouting (no login) is used, see scout/README.md
+#   access: public  # public | logged_in_browser — set this when the user confirms how the scout should access X
+accounts:
+  - handle: kimmonismus
+    role: releases_and_rumors
+    notes: "Chubby — Tech Analyst & Content Creator, Editor-in-Chief @getsuperintel. First scout account, singled out by the user 2026-10-24. Posts demos/news, not an official company source — verify any release against the original announcement before publishing as a release."
+  # Big-AI-company employee profiles — added 2026-10-26 per user
+  # ("add all big ai company employee profiles to accounts"). All are
+  # company leaders whose posts ARE the announcement when they announce.
+  # Role releases_and_rumors for all: they announce and comment.
+  # NOTE: X timelines are read by public methods only (no login,
+  # fxtwitter flaky) — listing an account does not guarantee its
+  # timeline is readable on a given run; workers report unreadable
+  # accounts with the next published clip.
+  - handle: sama
+    role: releases_and_rumors
+    notes: "Sam Altman, CEO of OpenAI. Added 2026-10-26."
+  - handle: gdb
+    role: releases_and_rumors
+    notes: "Greg Brockman, President of OpenAI. Added 2026-10-26 after the scout missed his Oct 26 science-discoveries announcement."
+  - handle: DarioAmodei
+    role: releases_and_rumors
+    notes: "Dario Amodei, CEO of Anthropic. Added 2026-10-26."
+  - handle: demishassabis
+    role: releases_and_rumors
+    notes: "Demis Hassabis, CEO of Google DeepMind. Added 2026-10-26."
+  - handle: JeffDean
+    role: releases_and_rumors
+    notes: "Jeff Dean, Chief Scientist at Google. Added 2026-10-26."
+  - handle: ylecun
+    role: releases_and_rumors
+    notes: "Yann LeCun, Chief AI Scientist at Meta. Added 2026-10-26."
+  - handle: elonmusk
+    role: releases_and_rumors
+    notes: "Elon Musk, head of xAI. HIGH VOLUME, mostly non-AI — filter strictly to notable AI posts only. Added 2026-10-26."
+  - handle: mustafasuleyman
+    role: releases_and_rumors
+    notes: "Mustafa Suleyman, CEO of Microsoft AI. Added 2026-10-26."
+  - handle: satyanadella
+    role: releases_and_rumors
+    notes: "Satya Nadella, CEO of Microsoft. Added 2026-10-26."
+  - handle: ArthurMensh
+    role: releases_and_rumors
+    notes: "Arthur Mensch, CEO of Mistral AI. Added 2026-10-26."
+  - handle: aidangomez
+    role: releases_and_rumors
+    notes: "Aidan Gomez, CEO of Cohere. Handle verified via web search 2026-10-26. Added 2026-10-26."
+  - handle: AravSrinivas
+    role: releases_and_rumors
+    notes: "Aravind Srinivas, CEO of Perplexity. Handle verified via web search 2026-10-26. Added 2026-10-26."
+  - handle: miramurati
+    role: releases_and_rumors
+    notes: "Mira Murati, CEO of Thinking Machines Lab (ex-OpenAI CTO). Handle verified via web search 2026-10-26. Added 2026-10-26."
