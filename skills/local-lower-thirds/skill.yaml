@@ -1,0 +1,24 @@
+name: local_lower_thirds
+title: Lower thirds
+description: Make animated lower thirds and other broadcast overlays for speakers, shows, and streams, as transparent overlay files or vertical video, whenever a name, role, title, or roster of names needs an on screen caption.
+category: Creation
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  status: active
+  evidence_handles:
+  - 5fe1e4195d8d95a0615683fc7127cf5890963803ce985ebe7bef4c82ad396948
+  - d71ec13db1cebcddabd9518e7ff829e94d3648da9221cd9076bec7a52b66e8e1
+  - cron_run:e29962c1-44a5-4daf-8d3b-6304605173db
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: Requests for animated lower thirds in the window are served by local_lower_thirds, with no session invoking the retired local_tiktok_lower_thirds trigger phrases and no transcript evidence of confusion between the two lower third skills.
+    window_days: 21
+  needs_review: false
+  rationale: 'The run brief counts 18 active learned skills, which triggers consolidation before any new skill. The two lower third skills carry the same trigger phrases for making an animated lower third and teach the same craft: a two line name and role card, a staggered bar to name to role reveal, a still readable hold, title safe placement, legibility over unknown footage, and one template rendered across a roster. Their only real difference is delivery, a transparent overlay built on canvas for OBS and editors versus a frame driven vertical video title, and the merged skill preserves both deliveries and chooses by destination, with the Remotion component still reachable from the retired folder on disk. The deterministic candidates were rejected: the repeated handoff suppression candidates and the goals_bookkeeping recurring failure target objective loop trigger cadence and prompt surfaces this loop never changes, the 58 subagent and tool failures carry generic exec and edit terminal reasons with no error text attributable to a skill, and the cron window shows 0 failed runs with the daily pipeline run e29962c1 succeeded.'
+  review_after: 2026-11-15T13:39:16.882721+00:00
+  reviewed_at: 2026-10-25T13:39:16.882721+00:00
+  run_id: sirun_5e45decd157943f687ec423f44ce3785
