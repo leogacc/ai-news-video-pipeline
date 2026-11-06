@@ -913,6 +913,78 @@ def _is_adblock_wall(path: Path) -> bool:
         return False
 
 
+def _is_adblock_modal(path: Path) -> bool:
+    """Detect adblock modals OVER a dense article (2026-10-24).
+
+    Third wall type, missed 2026-10-24 at 00:44 in the daily video:
+    the New York Post adblock modal is a large centered WHITE box
+    (header + "ALLOW ADS" button in solid red) laid OVER a dense
+    article page, not a sparse page and not a vivid solid block.
+    The two existing scans both miss it: _is_adblock_wall early-returns
+    False on dense pages (this shot: 55.7% dark-pixel density), and
+    _is_paywall_modal needs >45% saturation in the center (this shot:
+    mostly white modal, so it fails too).
+
+    Signature, verified against every cached screenshot (2026-10-24):
+    a solid vivid-red component (>5% of pixels — the red header +
+    button, 19.1% on the NY Post shot) PLUS a large solid white
+    connected component spanning >50% of the width and >30% of the
+    height, filling >60% of its bounding box, covering >25% of the
+    image. The only positives in the cache are the two NY Post
+    adblock modals; normal articles, white-heavy pages, and red
+    app banners (inshorts: white fill only 0.25) do not fire.
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+        im = Image.open(path).convert("RGB")
+        arr = np.array(im).astype(float)
+        r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+        red_frac = ((r > 150) & (g < 90) & (b < 90)).mean()
+        if red_frac < 0.05:
+            return False
+        white = (r > 200) & (g > 200) & (b > 200)
+        small = np.array(Image.fromarray(white).resize(
+            (160, 100), Image.NEAREST))
+        seen = np.zeros_like(small, dtype=bool)
+        total = small.size
+        for y in range(small.shape[0]):
+            for x in range(small.shape[1]):
+                if small[y, x] and not seen[y, x]:
+                    stack = [(y, x)]
+                    seen[y, x] = True
+                    xs, ys = [], []
+                    while stack:
+                        cy, cx = stack.pop()
+                        ys.append(cy)
+                        xs.append(cx)
+                        for dy in (-1, 0, 1):
+                            for dx in (-1, 0, 1):
+                                ny, nx = cy + dy, cx + dx
+                                if (0 <= ny < small.shape[0]
+                                        and 0 <= nx < small.shape[1]
+                                        and small[ny, nx] and not seen[ny, nx]):
+                                    seen[ny, nx] = True
+                                    stack.append((ny, nx))
+                    n = len(xs)
+                    bw = (max(xs) - min(xs) + 1) / 160
+                    bh = (max(ys) - min(ys) + 1) / 100
+                    box = ((max(ys) - min(ys) + 1)
+                           * (max(xs) - min(xs) + 1))
+                    fill = n / box if box else 0
+                    if (n / total > 0.25 and bw > 0.5
+                            and bh > 0.3 and fill > 0.6):
+                        print(f"[visuals] adblock modal detected: "
+                              f"solid white box ({n/total:.0%} of image, "
+                              f"fill={fill:.0%}) with red header/button "
+                              f"(red={red_frac:.0%})")
+                        return True
+        return False
+    except Exception as e:
+        print(f"[visuals] adblock-modal check failed: {e}")
+        return False
+
+
 def _is_paywall_modal(path: Path) -> bool:
     """Detect paywall/email-gate modals in screenshots (2026-10-11).
 
@@ -1517,7 +1589,7 @@ def _screenshot_article(page_url, title_hint="", subject_hint=""):
         dest.unlink(missing_ok=True)
         return None, None
     if (_is_verification_page(dest) or _is_paywall_modal(dest)
-            or _is_adblock_wall(dest)):
+            or _is_adblock_wall(dest) or _is_adblock_modal(dest)):
         print(f"{tag}: REJECTED - wall/modal detected")
         dest.unlink(missing_ok=True)
         return None, None
@@ -1533,7 +1605,7 @@ def _screenshot_article(page_url, title_hint="", subject_hint=""):
     # check, then the crop kept only the wall text. Re-scan AFTER
     # cropping; a crop that isolates a wall is still a wall.
     if (_is_verification_page(dest) or _is_paywall_modal(dest)
-            or _is_adblock_wall(dest)):
+            or _is_adblock_wall(dest) or _is_adblock_modal(dest)):
         print(f"{tag}: REJECTED - wall/modal isolated by crop")
         dest.unlink(missing_ok=True)
         return None, None
@@ -2073,14 +2145,18 @@ def main():
     #   1. a distinct pinned hero `hook_hero_<story_id>.png/.jpg/.mp4`
     #      (the worker pins one per story for future runs — a visual
     #      NOT used in the deep dive, so the hook is not a repeat);
-    #   2. the story's central person photo (`story_people`) — a face
-    #      reads instantly in a 4s hook, and it is a different file
-    #      from the deep-dive person pin in most runs;
-    #   3. the story's first non-document deep-dive photo (its opener);
-    #   4. the story's first deep-dive shot of any kind.
-    # Cases 3-4 preview the deep-dive opener in the hook (a teaser, the
-    # same subject-preview the old pairs already did with person
-    # photos); only case 1 avoids any repeat, which is why the worker
+    #   2. the story's first non-document, NON-PERSON deep-dive photo
+    #      (its opener) — actual news material, never a face;
+    #   3. the story's first non-person deep-dive shot of any kind.
+    #   2026-10-27 (user: intro must show actual news material, not CEO
+    #   faces): person photos are NEVER hook heroes. The old step 2
+    #   (story_people face) is retired — it shipped Hassabis, Nadella
+    #   and Mayer faces as hooks 1, 2 and 5 on 2026-10-27. If a story
+    #   has no non-person visual at all, the hook falls back to its
+    #   first deep-dive shot with a LOUD warning (never silent, never
+    #   blank) — and frame review must flag it as a defect.
+    # Cases 2-3 preview the deep-dive opener in the hook (a teaser);
+    # only case 1 avoids any repeat, which is why the worker
     # instruction now asks for distinct heroes.
     # Landscape keeps the old pair path (parked branch, untouched).
     if mode == "landscape":
@@ -2121,20 +2197,24 @@ def main():
                     hero = str(_hp.resolve())
                     hero_kind = "clip" if _ext == ".mp4" else "photo"
                     break
-            if hero is None:
-                _pf = (script.get("story_people", {}) or {}).get(sid, "")
-                _pp = ROOT / "cache" / "verified" / _pf if _pf else None
-                if _pp and _pp.exists() and _pp.stat().st_size >= 10_000:
-                    hero = str(_pp.resolve())
-                    hero_person = True
             _story_shots = [v for v in visuals
                             if v.get("segment") == _story_seg.get(sid)
                             and v.get("seg_kind") == "story"]
             if hero is None and _story_shots:
-                _opener = next((v for v in _story_shots
+                _nonperson = [v for v in _story_shots
+                              if not v.get("person")]
+                _opener = next((v for v in _nonperson
                                 if v.get("kind") == "photo"
                                 and not v.get("doc")), None)
-                _pick = _opener or _story_shots[0]
+                _pick = _opener or (_nonperson[0] if _nonperson else None)
+                if _pick is None:
+                    # No news material at all: last resort so the hook is
+                    # never blank — but LOUD, so frame review flags it.
+                    _pick = _story_shots[0]
+                    print(f"[visuals] WARNING hook {seg_idx}: story {sid} "
+                          f"has NO non-person visual; hook falls back to "
+                          f"person shot ({Path(_pick['path']).name}) — "
+                          f"pin a news-material hook_hero_{sid} instead")
                 hero = _pick["path"]
                 hero_kind = _pick["kind"]
                 hero_person = bool(_pick.get("person"))
