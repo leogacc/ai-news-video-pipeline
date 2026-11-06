@@ -1,0 +1,10 @@
+name: local_shot_grammar
+title: Local shot grammar
+description: 'Shot-selection grammar for AI news videos: every script sentence gets a visual that literally shows its subject (person→face, company→building, action→literal, situation→metaphor). Use when planning visuals for a video script, writing the shots list, or auditing shots for decorative filler.'
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
