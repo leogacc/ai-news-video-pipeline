@@ -1,0 +1,10 @@
+name: local_generative_illustration
+title: Local generative illustration
+description: This skill should be used when the user asks to "make an animated illustration", "animate an illustration", "make a generative motion piece" / "动态平面", "turn AI-generated art into something that moves", "make a poetic or ambient motion piece / motion poem", "make a visual metaphor", or "combine AI-generated visuals with code-driven motion". Covers generating isolated illustration assets with AI, compositing them as sprites, frame-accurate deterministic rendering, and the craft of expressive, concept-driven motion. NOT for data charts (use chart-animation), pure text (use kinetic-typography), or 3D/particles (use webgl-animation).
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
