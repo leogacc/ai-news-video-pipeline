@@ -1,0 +1,21 @@
+name: local_animated_infographic
+title: Local animated infographic
+description: This skill should be used when the user asks to "make an animated infographic", "create an infographic video", "build an infographic animation", "animate an explainer infographic", "do a sequenced reveal of icons and stats", "animate icons with key numbers and connectors", or "lay out a designed infographic that animates in sequence". Covers infographic layout & visual hierarchy, staggered element reveals, animating icons/pictograms, key-number counters, connectors/flow, and section pacing. For heavy charting (bar chart race, charts from a CSV) use the chart-animation skill instead.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: false
+  status: retired
+  evidence_handles:
+  - 8255fb269304cea2677b27ae2687ee5f53b9d74d9cc3032add8c23e1c030d64f
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: No session in the window routes an animated-infographic request to the retired skill; the merged skill serves them.
+    window_days: 21
+  rationale: 'Retirement half of the data-visualization consolidation: local_animated_infographic is superseded by local_animated_data_visualization, proposed in the same batch under the same finding.'
+  review_after: 2026-11-09T13:44:05.903178+00:00
+  reviewed_at: 2026-10-19T13:44:05.903178+00:00
+  run_id: sirun_70094e19caad4201a7b8249bac3721eb
