@@ -1,0 +1,109 @@
+# Rumors Digest — template (new, 2026-10-24)
+# Status: draft, created for the X scout cron. A COPY of the Daily Digest
+# template, adapted for rumors only — not a copy of the daily news run.
+# The daily run still reads pipeline/config.yaml and pipeline/*.py; this
+# file is the template definition, not yet a runtime input. Wire it in
+# only on approval.
+id: rumors-digest
+name: Rumors Digest
+is_main: false
+based_on: daily-digest  # same style and format, 3 stories instead of 5, rumors only
+
+format:
+  width: 1080
+  height: 1920
+  aspect: "9:16"
+  fps: 30
+  codec: h264
+  profile: high
+  level: 4.0
+  pix_fmt: yuv420p
+  faststart: true
+  loudness_lufs: -14
+
+content:
+  stories: 3
+  type: rumors_only  # never mix confirmed releases into this digest; releases go to clips, not here
+  order: most-interesting-first
+  structure:
+    - hooks: 3 rapid headline cuts, one per rumor, ~2s each, kind=hook, each with story_id
+    - self_plug: one branding line after the hooks, kind=hook, no story_id
+      text: "This is a top three AI rumors digest. The digest starts now, follow to stay ahead, the extended version and quick cuts are at the link in bio"
+    - deep_dives: 1-2 segments per rumor, kind=story, ~55-70 words each, 3-4 distinct facts, never restating the headline
+  words_total: [180, 270]
+  reading_level_max: 9.5  # Flesch-Kincaid
+  duration_target_seconds: ~100
+
+style:
+  captions:
+    style: terminal per-letter typewriter, trailing block cursor
+    color: "#39FF14"
+    background: pure black
+    background_rule: "Captions sit on SOLID BLACK on every frame (hooks, brand, dives) — never over video or a blurred background. Implementation (2026-10-25 fixed version): paint a solid black bar y1500..1920 on every frame; the bio block ends at y1500, so the bar leaves it untouched and every caption glyph sits on black, exactly as the daily digest's caption zone."
+    fade: 70px smoothstep at y 1380..1450
+    text_top_y: 1450
+  vertical_zones:
+    rule: UNIFIED ZONES (2026-10-25, same as the Daily Digest template and templates/clips/template.yaml unified_vertical_zones, adapted to 3 rumors). Frame 1080x1920. Captions are FIXED at the bottom (text_top_y 1450, first glyph row ~1521+) and never move; mid content is NEVER too high, so no shot may end its visual high and leave a black band above the captions.
+    deep_dives_and_hooks: hook heroes and deep-dive visuals fill the frame. Padded / blur-pad shots extend their sharp visual down to y1490 — this supersedes any older y0..1400 sharp-image cap for deep-dive shots. Cover-fill shots fill the full frame.
+    text_stacks: any title / bio / analytical text stack follows the clips stack rule — its bottom sits within ~25px of the first caption glyph row, never overlapping the captions, and never riding high in the frame.
+    measurable_check: on final-render frames (hooks, each deep dive, self-plug), measure the bottom row of the lowest visual/text element against the first caption glyph row. FAIL the render if a deep-dive visual ends above y1400 or the gap to the captions exceeds ~60px — shift the visual down and re-render.
+    self_plug_note: the self-plug montage is a sliding composite, not a static stack, so its window is judged by its full split shot, not by a single panel row — see self_plug_montage below.
+  watermark:
+    text: "@leos.logos"
+    font: DejaVuSans-Bold, 34pt
+    color: white at 50% opacity (ffmpeg fontcolor=white@0.5)
+    position: top-left, x=60, y=190, rect [60,190,300,228] — same row centre (y~212) as the number pills, which sit upper-right, so the two never collide
+    duration: every frame, whole video (same as the Daily Digest watermark, render.py 2026-10-10) — never a single shot, never omitted
+    check: visible on final-render stills at start, middle, and end; must not sit under platform UI or overlap captions
+  number_pills:
+    size: 138x66
+    shape: rounded rectangle, dark, 50% transparent, clean blurred edge
+    format: "n/3"
+    position: upper-right, centred on W-198, 212
+    construction_EXACT_daily_pill: "Identical to the daily news digest's render.py number_badge (2026-10-23 standard) — NOT a blurred-photo background, NOT smaller text. Flat dark (24,24,24) at alpha 128, 24px transparent margin around the rect (canvas 186x114), mask radius 18 blurred (radius 14) into that margin so alpha fades 128 -> 0 over ~30px all round, DejaVuSans-Bold 42 white opaque text. Canvas pasted at (789, 155), so the rect lands at x813..951, y179..245. A rumors pill built any other way (blurred underlying image, 32pt text) is a defect — see 2026-10-25 fixed version."
+    behaviour: fade in once per story, stay solid through its shots; story-less hooks get none
+  hooks:
+    hero: most relevant source footage (showcase pic/video from the source, or cropped screenshot of the most credible source); person photo only as fallback; a hero previewing its deep-dive article is intentional, not a duplicate
+  self_plug_montage:
+    type: split, adapted to 3 rows max — or omitted if no central persons are identifiable
+    rumors_brand_fix_2026_10_25: "The rumors brand segment is the daily-style self-plug montage, NOT a blurred triptych: a 3-row Pixar portrait (CEO rule, story order) with characters left / company logos right, sliding top-to-bottom 5.69s then holding the full split shot to fill the segment. Built by a rumors-specific script so the daily intro_people.png is never touched."
+    layout: left side characters, right side company/icon logos, only when the persons are verified
+    logos_from: script.json story_ids -> story_icons (glyphs are drawn icons, not missing-logo fallbacks)
+    motion: simply slides top-to-bottom over the tall split composite, then holds the full split shot with all pairs at once
+    rows: crop ONLY each character's own panel band, never a square face crop that pulls in neighbouring panels
+    cover_fill: never — self-plug clips stay in y 0..1490, above the captions (first glyph row ~1521+), so the full split shot fills down toward the captions instead of ending high at y1400; the caption fade sits just above the captions, not as a hard cut at 1400
+  portrait:
+    type: Pixar-style group portrait, 9:16, top-to-bottom story order, ONLY if 3 central persons are verified; otherwise no group portrait, use per-story visuals
+    attire: each character in a DIFFERENT outfit, never all in dark suits
+    background: relevant per character (not pure black)
+    aspect_check: width/height <= 0.85, renderer fails loud on landscape
+  voice:
+    engine: Kokoro
+    voice: am_echo
+    speed: 1.20
+  music: off  # same as Daily Digest for now
+
+rumor_rules:
+  - leaks count as rumors (user 2026-10-26): leaked models, documents, benchmarks, or internal information are eligible rumor stories — unconfirmed by definition, labelled RUMOR (and as a leak where that is what it is) with source account, date, and "not confirmed", exactly like any other rumor; the usual rules still apply (no fabricated quotes, no instructions facilitating wrongdoing, never present as confirmed)
+  - every rumor story must be labelled as a RUMOR on screen and in the description — never present an unconfirmed rumor as a confirmed release
+  - every rumor carries its source account, post date, and what is actually claimed, in plain words (e.g. "reported by X, not confirmed by the company")
+  - never invent a source, a date, or a confirmation; if the source is a single leaker post with no corroboration, say so
+  - a rumor that later becomes a confirmed release is a NEW release, not a duplicate — it may then go to clips, with a note that it was previously rumored
+  - no rumor is published on a single anonymous post alone unless the scout account list explicitly marks that account as a trusted leaker; otherwise it needs corroboration or it is held for the next scout run
+
+visual_rules:
+  - same as Daily Digest: verified pins first, vision-cropped document/X shots, no Commons, stock illustrative only, literal broll, no repeats, no black frames, no generic listing screenshots, no verification/CAPTCHA/paywall walls, no full-frame logos in deep dives
+  - evidence cannot appear before its subject is spoken; visual changes align with narration/story starts
+  - analytical text above the caption zone; no mid-screen text without an analytical chart
+  - visual zone fills to the captions (see style.vertical_zones): no deep-dive shot ends its visual above y1490 leaving a black band above the captions; mid content is never too high
+  - per-speaker face check from the clips template applies here too: at every speaker change, verify text does not hit the active speaker's face, and if it does move the text a little lower and re-check
+  - "FOOTAGE PRIORITY FOR NARRATED FORMATS (globalized from footage_priority_2026_10_27, 2026-10-27): show the thing itself, not a post about the thing. Priority: (1) MOVING source footage first — video of the source/company explaining, the product in action, the demo running, real footage of the subject — playing UNDER the narration with terminal captions continuing over it; (2) other useful footage as cutaways; (3) vision-cropped ROOT-source stills only when no video exists (announcement page, official blog, repo, paper, product page — kicker + complete headline + dek + byline, no site chrome); (4) narration over stills last. NEVER show a third-party surfacing post as a visual — no X/Threads post card of the account that surfaced the story. A still is never passed off as footage; video must move. NOTE: the clips template's source-audio-backbone clause stays clips-only and does NOT apply here — narrated digests are narrated throughout (Kokoro narration + terminal captions), so source footage plays under the narration and never replaces it."
+
+publish:
+  mode: telegram_queue
+  tiktok_description:
+    format: "Here are the three biggest AI rumors for {Day, Month Date with ordinal}: [3 clauses, ', and' before last]. [1-2 engagement questions hooked on rumor #1]\n[exactly 5 hashtags as the FINAL line]"
+    never_claim_to_be_ai: true
+    never_present_rumors_as_confirmed: true
+    sent_to_telegram_with_video: true
+  dedupe: "never repeat rumors already shared (scout/state.json posted_rumor_ids, plus pipeline/state.json posted_ids); a rumor already covered in a previous rumors digest is not re-covered unless new evidence materially changes it — EXCEPTION (user 2026-10-25 22:02, daily 6am digest only): if fewer than 3 fresh rumors, fill to 3 with older ACTIVE (still unconfirmed, verified still active) rumors, labelled ONGOING / previously covered on screen and in the description, rotating so the same trio does not repeat two days running; still need 3 total or hold"
