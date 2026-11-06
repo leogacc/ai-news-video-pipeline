@@ -1,12 +1,27 @@
-__pycache__/
-output/audio/
-output/segments/
-output/*.mp4
-output/*.wav
-cache/clips/
+# Secrets and local runtime state — never commit these.
+.env
 token.pickle
 client_secrets.json
-.env
+
+# Python
 .venv/
+__pycache__/
+*.pyc
+
+# Pipeline runtime (regenerable, local-only)
+pipeline/cache/
+pipeline/output/
+pipeline/logs/
+pipeline/backups/
 .kokoro_cache/
-tweetshot/node_modules/
+.logs/
+
+# Node
+pipeline/tweetshot/node_modules/
+
+# Scout per-run logs (state files stay: saved_items.json, state.json, clipped_finds.json)
+scout/runs/
+
+# Rendered media (videos live in the Telegram review queue, not the repo)
+*.mp4
+*.wav
