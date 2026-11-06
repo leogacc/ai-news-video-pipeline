@@ -1,12 +1,103 @@
-# Clips — NEW template (draft, 2026-10-24)
-# Status: draft, not yet used by any run. Single-story short clips in the
-# same terminal style as Daily Digest, but built for one story at a time —
-# standalone, or cut down from a Daily Digest story segment.
-# Confirm/adjust the draft parameters below before wiring this in.
+# Clips — template (live in the scout runs since 2026-10-24; footage rules revised 2026-10-27, see footage_priority_2026_10_27)
+# Status: live. A clip is processed FROM a source: source video first,
+# otherwise source footage + narration fallback. Transcribe it, find the
+# hook, identify the speaker(s), title it in the lower third, and show
+# the most informative version — the full video uncut when the whole
+# thing is dense and relevant, otherwise the single most interesting part.
+# This version supersedes all earlier clips drafts: top-bar titles,
+# middle-over-chest titles, black-bar / blur-pad strips, and
+# bio blocks wider than the title are all retired.
 id: clips
 name: Clips
 is_main: false
-based_on: daily-digest  # same style, different structure and length
+based_on: daily-digest  # same style and format, different workflow
+
+input:
+  source_video: a finished video with narration (e.g. a Daily Digest video, or an external video like an interview clip)
+  transcript:
+    pipeline_video: reuse its existing transcript (script.json segments and words.json / captions.ass word timings)
+    other_video: transcribe first (faster-whisper base.en, same model as pipeline/config.yaml), with word timings — never guess timings from the video length
+
+processing:
+  # Ordered steps. No step invents narration, visuals, a hook, or a speaker.
+  1_transcribe:
+    description: get the full transcript with sentence/segment start and end times
+  2_scan_transcript_for_speakers:
+    description: SCAN THE TRANSCRIPT FOR WHO IS TALKING WHEN. Label every
+      segment with a speaker_id, start/end, and speaker name where it can
+      be verified (from the transcript, show credits, or the source post).
+      Use speaker diarization (e.g. pyannote-audio / WhisperX speaker
+      labels) where available; where diarization is unavailable, detect
+      speaker changes from turn-taking in the transcript and verify each
+      change by ear/eye against the video. Record every speaker-change
+      timestamp — this list drives the per-speaker frame check in step 7.
+      A single-speaker source gets one speaker_id for the whole video;
+      a multi-speaker source gets one entry per turn.
+  3_rank:
+    description: rank every transcript segment by interest, using the same
+      "most interesting first" judgement as Daily Digest — payoff, number
+      or money, mechanism, surprise, conflict — not by position in the video
+  4_pick_or_keep_full:
+    description: DECIDE CUT vs FULL. If the whole source video is
+      information-dense and relevant to the hook throughout, DO NOT CUT
+      IT — use the full video, uncut. Trimming is only for sources where
+      a single part is clearly the highlight and the rest is filler. Any
+      trimmed clip must start at the definition of its subject and end on
+      a complete thought, never mid-anecdote, even if that pushes it past
+      the typical 15-45s range.
+  5_hook_as_title:
+    description: take the most interesting hook, with enough context to
+      name what the hook is about (not just "that gap"), using verbatim
+      words from the transcript where possible — no rewriting, no invented
+      hook
+  6_speaker_id:
+    description: build the bio line for the speaker(s) — name, role / why
+      they matter, and show/context, e.g. "Marc Andreessen — Netscape &
+      a16z co-founder / on The a16z Show, with Ben Horowitz & Chris Dixon".
+      For a multi-speaker source, the bio line follows the active speaker
+      per segment where the show/context allows it; otherwise it names the
+      main speaker and the show.
+  7_frame_check_per_speaker:
+    description: FOR EVERY SPEAKER SEGMENT, frame-check at the segment
+      start and midpoint — detect the ACTIVE speaker's face bounding box
+      and verify the title and bio blocks do NOT hit / overlap that face.
+      If they do, MOVE THE TEXT A LITTLE LOWER — shift the title + bio
+      stack down in small steps (e.g. 40px) and re-check, until the face
+      is clear. Keep the bio block above any burnt-in subtitles and above
+      the bottom safe area; if face clearance and subtitle clearance cannot
+      both be met, shrink the text and re-check, and if that still fails,
+      flag the segment for manual review — never ship text over a face.
+      Also re-centre the face crop on the active speaker for that segment,
+      so the main person talking stays centred (a fixed centre crop is
+      only valid for a single-speaker source).
+  8_render:
+    description: render in full-screen 9:16, face-centred crop per speaker
+      segment, with the title + bio blocks in the lower third (see style),
+      original audio, no re-recording
+  9_captions:
+    description: keep the source captions for the output, re-timed to the
+      clip start if trimmed, as-is if full — so the output is
+      self-contained. Do NOT add new terminal captions when the source
+      already has burnt-in subtitles; that would double them. Captions /
+      title / bio must never overlap the active speaker's face (step 7).
+  narration_fallback:
+    description: ONLY when the source has NO audio or video (text-only
+      post, article link, image only) — as used by the X scout for
+      releases. Write a short script from the verified source text only,
+      no invented facts, dates, or quotes, narrate it with Kokoro am_echo
+      at 1.20x, terminal captions, and visuals following
+      footage_priority_2026_10_27 (source footage first, root-source
+      stills next — never a surfacing-post card). The bio line
+      then names the source account / company, not a person who is not
+      speaking. This fallback never applies when source audio/video exists
+      — then use the source audio, never re-narrate it.
+  10_qa_before_publish:
+    description: frame-check at every speaker-change time plus start,
+      middle, and end — title and bio fully in frame, same width, separate
+      blocks, no overlap with each other, with the face, or with burnt-in
+      subtitles; no black frames at trim points (shift a trim to the
+      nearest non-black frame within the segment). Only publish when all
+      checks pass.
 
 format:
   width: 1080
@@ -21,44 +112,114 @@ format:
   loudness_lufs: -14
 
 content:
-  stories: 1
-  structure:
-    - hook: 1 punchy headline sentence with the payoff baked in, kind=hook, with story_id
-    - deep_dive: 1 segment, kind=story, 3-4 distinct facts, never restating the headline
-    - branding: short end line, kind=hook, no story_id
-      text: "Follow to stay ahead, the full digest is at the link in bio"
-  words_total: [90, 130]
-  reading_level_max: 9.5  # Flesch-Kincaid, same gate as Daily Digest
-  duration_target_seconds: [30, 60]
+  stories: 1  # one source video, one hook
+  output: full video uncut when information-dense and relevant throughout; otherwise only the picked part — nothing before it, nothing after it, no other segments
+  words_total: full transcript words if uncut, segment words if trimmed (no fixed target; duration follows the source / segment)
+  reading_level_max: 9.5  # Flesch-Kincaid, same gate as Daily Digest, applied to newly written title / bio / description text, not to verbatim transcript speech
+  duration_target_seconds: full source duration if uncut; segment duration if trimmed (do not pad or stretch to a fixed length)
 
 style:
+  title_on_top:
+    text: the most interesting hook, with enough context to name what the hook is about (not just "that gap")
+    position: LOWER THIRD, centred horizontally, on top of the video itself, for the whole clip duration — away from the speaker's face, above any burnt-in subtitles. NOT a top bar above the video, NOT in the middle over the chest.
+    layout: wrapped to at most 3 lines, on a semi-transparent black box so it reads over the video
+    color: white on black for a title over video, unless the hook needs terminal green for contrast
+    rule: title stays on top for the entire clip — it is not a 2-second intro card
+  no_face_layout:
+    rule: when there is NO face to protect (a UI/demo/screen source, not a talking head), do NOT waste the top black space with a title underneath the video. Use a tight centred stack — TITLE CLOSE ABOVE THE CONTENT, CONTENT CENTRED ON THE SCREEN CENTRE, CREATOR/BIO BLOCK CLOSE BELOW THE CONTENT (higher than a centred lower-third block). All text centred within its box, boxes centred horizontally. Gaps are small (36-40px), not the wide v3 gaps.
+    zones_1080x1920: title y368-620, content (1080x608) y656-1264 with centre exactly 960, creator/bio block y1304-1502 for a 3-line bio. Title, content, and bio never overlap each other, and none overlaps burnt-in subtitles or any small avatar.
+    example: Dessa clip v4 (2026-10-24, supersedes v3) — title y368-620, video y656-1264, bio y1304-1502, frame-checked at 5/30/60s.
+  narrated_clip_zones_1080x1920:
+    rule: for NARRATED clips (scout finds with no source audio/video — a text post plus source screenshots, not a source video), use these zones on every clip, no exceptions. Captions stay exactly where they are (terminal captions, first glyph row ~1521); everything else moves DOWN toward them so the stack sits middle-centre instead of riding high with a black band above the captions.
+    zones: title y135-345, content zone y375-1325 (950 tall, sharp image centred inside it on a CLEAN BLACK background — NO blur background fill; content scaled down to max 960 wide so it carries black side padding), bio y1370-1500 (same width as the title box, separate block). Bio bottom ends ~21px above the first caption glyph row — never more than ~25px above it, and never overlapping the captions.
+    dynamic_hug_2026_11_01: "(user, 2026-11-01, on the HackerTube clip) SUPERSEDES the fixed zones above for narrated clips: the title (top) and bio (bottom) text blocks must DYNAMICALLY HUG the mid content on EVERY shot — no dead space between text and content. Mechanism (pipeline/clip_frames.py, proven by HackerTube v2): content stays centred in the middle zone y375..1325 on clean black, max 960 wide; the title box sits directly above the content (box bottom = content_top - 20px) and the bio box directly below it (box top = content_bottom + 20px); boxes are sized to their text (title: 60px line height + 20px padding top/bottom; bio: 48px line height + 16px padding top/bottom), so white-text-to-content gaps are 40px (title side) and 36px (bio side) — the same 36-40px standard the no-face layout already uses. Hard limits: title top never above y130 (watermark clearance), bio bottom never below y1500 (captions at glyph row ~1530); content max height is capped (min(950, 2*(630 - bio_h))) so the bio can never overflow. Measured on HackerTube v2: shot 1 content y490..1210, title y310..470, bio y1230..1358; shot 2 content y571..1128, title y391..551, bio y1148..1276 — v1 gaps were ~190/172px (shot 1) and ~271/254px (shot 2). This rule also supersedes the y1400 stack-bottom check in unified_vertical_zones for narrated clips: with hugging, short content yields balanced top/bottom margins, not a top-heavy frame, and the gap that matters is text-to-content (36-40px). Content position itself does not move — only the text moves to it."
+    no_blur_background_2026_10_30: "(user, 2026-10-30, on the Suncatcher clip) NEVER use a blurred background behind mid content — no blur-pad fill in the content zone, on any clip. The content zone stays clean black; scale the content down (narrated clips: max 960 wide in the 1080 frame) so it carries black padding on the sides instead of touching the frame edges. This generalizes the 2026-10-24 landscape-interview lesson (clean black, not blur-pad) to all clips. The title/bio blocks keep their v3 feathered treatment — that blur is the text blocks' own backing, not a content background. Measurable check: on final-clip frames, the content image's left edge sits at x>=60 and no blurred fill is visible behind it; a blur-pad background FAILS QA."
+    caption_overlap_rule_2026_10_26: "(Cohere clip fix) Typewriter captions — NEVER append a forced line break to a line-final letter event — that renders a cursor-only next line for 1-2 frames and jumps the block up into the bio; defer the break to the next line's first letter event. Per-event line counts must count forced breaks segment-by-segment (a cursor-only segment still occupies a rendered line) — greedy re-wrap ignoring breaks undercounts and jumps the block 88px up. The block cursor extends above the glyph row, so pin first glyph row ~1530 (bio-to-glyph gap ~30px, inside the 60px cap), not 1521. Measurable check on every narrated clip: scan sampled frames for caption-green pixels — FAIL if any caption green appears above y1500."
+    caption_anchor_rule_2026_10_26: "(Cohere clip fix v2) Typewriter captions are TOP-ANCHORED, never bottom-anchored with a per-event MarginV ladder. A bottom-anchored ladder assumes a libass line height (88px) that libass does not use (~65-70px), so line 1 drifts ~20px per added line (measured 1531..1640 across the clip). Use ASS alignment 7 with ONE fixed style MarginV for all events (events inherit it, MarginV 0) — first glyph row is then identical on every frame and extra lines grow downward. Measurable check: first-line glyph y must be a single value (± cursor height, ~11px) across all sampled frames, not a range."
+    bio_source_rule_2026_10_26: "(user, 2026-10-26) The bio's SOURCE is the ROOT source — the company announcement, official blog, repo, paper, or product page the finding comes from (the clip's verified link) — NEVER the X or Threads post that surfaced it. Bio format: a single line, \"Source: <root source name>, <root date when verified, else the find's date>\" (the finding line was dropped 2026-11-05, see bio_source_only_2026_11_05). A bio that says \"via @handle on X/Threads\" as its source FAILS QA. The surfacing post may still be named in the description's source link; it is never the on-screen bio source. This applies to narrated clips and to any clip whose bio names a source; speaker name/role lines on source-video clips are unaffected."
+    bio_source_regular_2026_11_04: "(user, 2026-11-04) The bio block's SOURCE line is NOT bold — it renders in regular DejaVuSans, the bio is a single regular Source line now (the finding line was dropped 2026-11-05, see bio_source_only_2026_11_05); the title stays bold. Applies to narrated clips (pipeline/clip_frames.py: the Source: line gets BIO_FONT) and to source-video clip overlays (same per-line rule in their build code). Measurable check: on a final-clip frame, the Source line's glyphs are regular weight (visibly thinner than bold at the same size); a Source line rendered bold FAILS QA."
+    watermark_beneath_bio_2026_11_05: "(user, 2026-11-05) The @leos.logos watermark sits directly BENEATH the bio/source block on every clip frame — x=60, bio bottom + 20px, clamped so its bottom never passes y1495 (keeps the gap to the top-anchored captions) — and is 80% transparent (20% opaque, alpha 51). It may overlap the mid content. Applies to narrated clips (pipeline/clip_frames.py) and source-video clip overlays (same coordinates and alpha in their build code). Supersedes the middle-left placement from earlier the same day and the old top-left placement ((60,80) narrated, (60,190) source-video) and 50% opacity. Measurable check: on a final-clip frame, the watermark's top is ~20px below the bio block's bottom and its bottom is above y1495."
+    bio_no_find_prefix_2026_11_05: "(user, 2026-11-05) The on-screen bio no longer carries a 'FIND —' label prefix: line 1 is just the finding itself ('<what>'), line 2 is 'Source: <root>, <date>'. Applies to narrated clips (bio_lines in script.json) and source-video clip overlays. The Telegram description still says 'FIND:' (template publish rule, unchanged) — only the on-screen bio drops it. Measurable check: on a final-clip frame, the bio's first line contains no 'FIND' label."
+    bio_source_only_2026_11_05: "(user, 2026-11-05) The on-screen bio is the Source line ONLY: a single line, 'Source: <root>, <date>', in regular weight. The bold finding line is dropped entirely — it supersedes bio_no_find_prefix_2026_11_05 from earlier the same day, which had only removed its 'FIND —' label. Applies to narrated clips (bio_lines in script.json is a one-element list) and source-video clip overlays. The Telegram description is unchanged. Measurable check: on a final-clip frame, the bio block holds exactly one line and it starts with 'Source:'."
+    block_style_2026_10_25: BOTH the title (top) block and the bio/source block use the same treatment, on every narrated clip — text WHITE on both blocks (the bio/source text was terminal green before v3 — never green again), and the block backing is 50% transparent black, blurred, with a feathered (blur-faded) edge — never a hard opaque panel. Implementation — blur the frame region under the box, darken it 50% toward black, composite through a rounded-rectangle mask blurred for a soft edge fade. Over pure black the fill itself reads as black; the visible effect is the soft faded edge and the white text. Captions stay terminal green — only the title and bio/source text go white.
+    dead_space_rule_2026_10_25: NEVER leave a black band wider than ~60px between the bio block and the captions, on any shot. Measure it on final-clip frames before shipping — find the bio block's bottom row and the first caption glyph row above the captions zone and report the gap in pixels. If the gap is wider, shift the title + content + bio stack down (shrinking the content zone height if needed to keep the bio clear of the captions) and re-render — do not ship a top-heavy frame with dead space above the captions. This rule also governs source-video clips — every shot's visual zone must fill up to the captions the same way (GPU clip v4 precedent — visual zone rebuilt to y1490 against captions at y1501).
+    example: REA clip v2 (2026-10-25) — title y135-345, content y375-1325, bio y1370-1500, captions unchanged, bio-to-caption gap ~21px (was ~136px in v1 — bio ended y1385, first caption glyph y1521).
+  unified_vertical_zones:
+    rule: THESE ZONES GOVERN EVERY CLIP BUILD, whatever the clip type — narrated, source-video, or lower-third. Mid content is NEVER too high — no clip may ship with its content stack or visual zone ending high and leaving a black band above the captions. Captions never move to accommodate a high stack — the stack moves down to the captions.
+    frame: 1080x1920. Terminal captions are fixed at the bottom (block top y1450, first glyph row ~1521+); burnt-in subtitles, where present, are the caption zone instead, and no title/bio may overlap them.
+    by_type:
+      narrated: DYNAMIC HUG (2026-11-01) supersedes the fixed zones — title/bio hug the per-shot content per dynamic_hug_2026_11_01 in narrated_clip_zones_1080x1920 above; the y1400 stack-bottom check does not apply to hugged narrated clips.
+      source_video_no_face: content centred with centre exactly y960, bio block ending y1304-1502 — and if terminal captions are added to such a clip, the bio bottom must be y1500 or above, never below the first caption glyph row.
+      speaker_lower_third: title + bio stack sits in the lower third, stack bottom within ~25px of the first caption glyph row (or just above burnt-in subtitles where those exist) — never in the middle or top of the frame, except for the no-face title-above-content stack above.
+      any_other_visual: where no bio block intervenes, the visual zone must fill down to y1490 or below (GPU clip v4 precedent — visual zone rebuilt to y1490 against captions at y1501).
+    measurable_check: on final-clip frames (start, middle, end), measure the bottom row of the lowest stack/visual element and the first caption glyph row (or subtitle top where burnt-in). FAIL the clip if the stack/visual bottom ends above y1400, or if the gap to the captions exceeds ~60px — shift the stack down (shrinking the content zone height if needed to keep the bio clear of the captions) and re-render. This check supersedes any older zone or example in this file that ends a stack or visual higher.
+  speaker_id:
+    rule: when the speaker is identifiable, put a smaller speaker line as a SEPARATE block under the title, centred, with a clear gap — name, role / why they matter, and show/context
+    placement: title + bio blocks sit in the LOWER THIRD together, away from the speaker's face, above any burnt-in subtitles
+    bio_width_rule: the bio block must be the SAME LENGTH (width) as the main header block — measure the title box (PIL, longest title line at title fontsize + 2x boxborder) and draw the bio box at exactly that width, with bio text sized to fit inside it; never let the bio box run wider than the title box. Example, measured — title box 975px wide (longest title line 903px + 2x36), bio at 32px, widest bio line 935px, drawn in a 975px box.
+    per_speaker_rule: re-check the bio / title position at every speaker change (processing step 7); if the new speaker's face is hit by the text, move the text stack a little lower and re-check.
+  crop:
+    type: full-screen 9:16 face-centred crop for landscape sources, re-centred per active speaker segment — the main person talking stays centred. The v1 black-bar / blur-pad strip layout is retired.
+    landscape_source_note: a full-screen 9:16 face-centred crop keeps the speaker whole but cuts the left/right ends of any full-width burnt-in subtitles in the source — that trade-off is inherent to the crop, not a render defect
   captions:
-    style: terminal per-letter typewriter, trailing block cursor
-    color: "#39FF14"
-    background: pure black
-    fade: 70px smoothstep at y 1380..1450
-    text_top_y: 1450
-  number_pills: none  # single story, no x/5 numbering
-  hero: same rule as Daily Digest — most relevant source footage, person photo only as fallback
-  self_plug_montage: none  # no 5-character montage in a short clip
-  end_pair:
-    type: single character+logo pair, left character / right company or icon logo
-    source: that story's character and logo from script.json story_people / story_icons
-  portrait: none  # no group portrait; use the story's single person photo / character
+    style: source captions as-is (burnt-in) or terminal per-letter typewriter, trailing block cursor, only when the source has no burnt-in subtitles
+    color: "#39FF14"  # terminal captions only; source subtitle colours unchanged otherwise
+    note: title + bio sit above burnt-in subtitles with a gap; title, bio, and subtitles never overlap each other, and none of them overlap the active speaker's face
+  watermark:
+    text: "@leos.logos"
+    font: DejaVuSans-Bold, 34pt
+    color: white at 50% opacity (ffmpeg fontcolor=white@0.5)
+    rule: THE SAME watermark as the Daily Digest (render.py 2026-10-10) — same text, same font, same size, same 50% white, burned on every frame for the whole clip. Previous clips shipped WITHOUT it (e.g. the 2026-10-25 G1 clip stills show a bare top-left) — that is now a defect, not a style choice.
+    position: top-left, x=60, y=190, rect [60,190,300,228], for no-face and speaker lower-third layouts, where the top zone is clear.
+    narrated_exception: narrated clips put their title block at y135-345, which would collide with y190 — so for narrated clips ONLY, the watermark moves up to x=60, y=80 (top-left, above the title box, same text/font/size/opacity, following the landscape precedent in render.py where the watermark also sits at y=80). It never moves anywhere else, and it never drops out.
+    check: visible on final-clip stills at start, middle, and end; must not overlap title, bio, caption, or subtitle glyphs, and must not sit under platform UI.
+  number_pills: none  # single hook, no x/5 numbering
+  hero: none  # visuals are the source video's visuals, unchanged
+  self_plug_montage: none  # no 5-character montage in a clip
+  end_pair: none  # no end pair; the output ends when the source / picked part ends
+  portrait: none
   voice:
-    engine: Kokoro
-    voice: am_echo
-    speed: 1.10
+    engine: none  # reuse the source video's audio, do not re-record or re-synthesise
   music: off  # same as Daily Digest for now
 
 visual_rules:
-  - same as Daily Digest: verified pins first, vision-cropped document/X shots, no Commons, stock illustrative only, literal broll, no repeats, no black frames, no generic listing screenshots, no verification/paywall walls, no full-frame logos in the deep dive
-  - evidence cannot appear before its subject is spoken; visual changes align with narration
+  - "footage follows footage_priority_2026_10_27: source/company explaining on video first, useful footage as cutaways, root-source stills only when no video exists, narration last — and NEVER a third-party surfacing post as a visual"
+  - "visuals are NOT re-sourced for a clip: use the source video's frames, cropped per active speaker, exactly as they are"
+  - title + bio + the @leos.logos watermark are the only new visuals; title/bio sit in the lower third, never over the active speaker's face (checked per speaker segment, step 7), and the watermark sits top-left per style.watermark on every frame
+  - no new shots, no verified pins, no stock, no Commons for a clip itself
+  - no black frames at trim points; if a trim lands on a black frame, shift the trim to the nearest non-black frame within the segment
+
+footage_priority_2026_10_27:
+  # (user, 2026-10-27) "Prioritize video footage of the source/company
+  # explaining. Cut to any other useful footage. Don't show third party
+  # posts like chubby." Lessons carried over from the China crash montage
+  # edit (templates/montage-edit/template.yaml, v1-v10).
+  rule: the clip SHOWS the thing itself, not a post about the thing
+  priority_order:
+    1_source_explaining: "Video of the SOURCE explaining — the company / lab / founder / product team on camera, an official announcement video, a demo walkthrough from the source, the paper authors presenting. This is the first footage sought and the backbone of the clip, WITH ITS OWN AUDIO wherever it has any. Narration never replaces source audio that exists."
+    2_useful_cutaways: "Cut to any other USEFUL footage — the product in action, the repo demo running, the device / robot working, a real chart or document that carries a number, related real footage of the subject. Cutaways support the source footage; they never replace it as the backbone."
+    3_root_source_stills: "Only when no source video exists: vision-cropped stills of the ROOT source — the announcement page, official blog, repo, paper, or product page (same vision-crop rules as the daily pipeline: kicker + complete headline + dek + byline, no site chrome). A still is a still, never a frozen frame passed off as footage."
+    4_narration_last: "Narration (Kokoro am_echo 1.20x, terminal captions) is the LAST resort, for sources with no audio or video at all — and even then the visuals follow 1-3 above, never a post card."
+  never_show_surfacing_posts: "NEVER show a third-party post as a visual — no X / Threads post card, screenshot, or render of the post that surfaced the find (no kimmonismus / Chubby card, no intermediary's post), whether or not that post is the clip's source link. The surfacing post is a pointer for the description's source link only; it is never on screen. A clip whose visuals are a surfacing-post card FAILS QA. This retires the rendered Threads post card used in the 2026-10-27 Anthropic clip."
+  montage_lessons_applied:
+    no_pure_text: "No pure-text shots — text only inside a real visual (chart, banner, ticker, callout, document, demo UI). A figure or claim with no real visual is spoken or dropped, never carded as a text shot."
+    eye_verify_every_segment: "Eye-verify EVERY footage segment before shipping — watch what it actually shows, not what its filename or caption claims. A mislabeled clip (the montage's Shenzhen 'exchange' clip was a couple's selfie / travel video) is cut, never shipped on its label."
+    moving_video: "Video segments must MOVE — verify motion across the segment, never ship a frozen frame as video. Stills are treated as stills, not faked as footage."
+    source_audio_first: "When source / company footage has audio, use it. Silence elsewhere except source audio; no music, no bed, no re-narration over source speech."
+    honesty_labels: "Name what is actually shown, accurately — a chart is labelled by what it charts, footage is never presented as evidence it is not (the montage's CNBC = CSI300-not-STAR50 rule, dated-ticker rule). If a visual cannot be honestly labelled, cut it."
+    hard_cuts_watermark_qa: "Hard cuts only; @leos.logos watermark every frame; no black frames; no file that fails ffprobe — the same QA bar as the montage."
+  how_to_get_source_footage:
+    - "Pull the source's own video first: the announcement / demo video linked from the root source (official blog, repo README, product page, company channel)."
+    - "MANDATORY THREADS HUNT (v2026.10.28.1): for a Threads-sourced pick, BEFORE falling back to stills, run pipeline/threads_media.py on the surfacing post — the connector returns text only and NEVER supplies the post's media, so a hunt that stops at the connector has not hunted at all. The script extracts the post's own image files directly (curl of the /media viewer page; do not 'improve' its bare Mozilla/5.0 UA — a full Chrome UA gets a reduced page with no media URLs). Log the attempt + result in meta.json (media found / none / video-needs-browser-route). A stills fallback with no logged threads_media.py attempt FAILS the footage hunt."
+    - "ENUMERATE THE ROOT PAGE (v2026.10.28.2): when the root source is an article or blog page, list EVERY visual on the page before choosing shots — do not stop at the first chart found. The main comparison table is often the strongest shot. 2026-10-28 proof: the Gemini Carbon clip shipped the blog's ExploitGym chart but missed the blog's main evals comparison table, which the user had to supply."
+    - "SAME-STORY SWEEP (v2026.10.28.1): also hunt the surfacing account's OTHER posts about the same story from the last 24h — a same-story post may carry the best visual. 2026-10-28 proof: kimmonismus's Gemini Carbon post carried Google's official benchmark chart while the official announcement post carried none. Use the underlying source media itself (chart, demo frame, announcement graphic) — never a screenshot of the post card."
+    - "Threads video posts from the source: the embed-page download route (the /media page yields only a poster frame for video — threads_media.py reports needs_browser_embed_route honestly). Threads images from the source: pipeline/threads_media.py first; microlink full screenshot of the /media viewer + own-end crop only if the script finds nothing. TikTok / X direct media: yt-dlp (~/workspace/tools/bin/yt-dlp). Never third-party downloader sites."
+    - "If the source has no video at all, fall back to 3_root_source_stills, then 4_narration_last — and say so in the run report, so the gap is visible instead of papered over with a post card."
 
 publish:
   mode: telegram_queue
   tiktok_description:
-    format: "Here is one of the biggest AI stories for {Day, Month Date with ordinal}: [story clause]. [1 engagement question hooked on the story]\n[exactly 5 hashtags as the FINAL line]"
+    format: "[Full video, uncut, if uncut — otherwise hook title.] {Speaker name + role, show/context, and where/when}: {hook with context}. [Why it matters, 1-2 sentences]. [1 engagement question hooked on the hook]\nSource: {original link}\n[exactly 5 hashtags as the FINAL line]"
     never_claim_to_be_ai: true
     sent_to_telegram_with_video: true
-  dedupe: never repeat stories already shared (pipeline/state.json posted_ids), unless explicitly cutting a story already in that day's Daily Digest
+  dedupe: a clip is an excerpt, not a new story — it does NOT count against pipeline/state.json posted_ids, even when its story already ran in that day's Daily Digest; a full uncut repost of an external video follows the same rule
