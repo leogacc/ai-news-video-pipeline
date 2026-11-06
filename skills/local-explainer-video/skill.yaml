@@ -1,0 +1,10 @@
+name: local_explainer_video
+title: Local explainer video
+description: This skill should be used when the user asks to "make an explainer video", "turn this into a short explainer", "write a script and storyboard for a product video", "produce a how-it-works/onboarding video", "sync narration and captions", or "build a 30–90s animated explainer". Covers script→storyboard→scene build→narration/caption sync→edit→polish.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
