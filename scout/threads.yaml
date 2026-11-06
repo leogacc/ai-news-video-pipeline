@@ -1,0 +1,21 @@
+# Threads scout source — added 2026-10-25 (user: "Add Threads to the scout")
+# The scout worker must ONLY scout the accounts listed here, never guess others.
+# Access is via the Threads connector (threads-cli) with the user's linked
+# Threads account — NOT via web scraping. Resolve each account's numeric
+# user ID each run from the linked account's following list (both
+# kimmonismus and terries.ai are followed there as of 2026-10-26 —
+# see their entries); do NOT hardcode numeric user IDs in this file, in
+# chat reports, or in saved_items.json text — use the handle + permalink.
+# Rate limits are strict: page profile-threads at most 3 pages per run
+# and stop at the first post already in scout/saved_items.json (by
+# permalink). A 429 is final for that run's Threads calls — stop them,
+# do not retry, report the error with the next published clip.
+accounts:
+  - handle: kimmonismus
+    profile_url: https://www.threads.com/@kimmonismus
+    role: releases_and_rumors
+    notes: "Same person as X @kimmonismus (Kim Isenberg | Chubby). His Threads posts mirror his X posts (verified 2026-10-25: same Anthropic IPO, Opus token-volume, Kimi rate-limits, Nanbeige, and G1 ladder items on both), so Threads is coverage for X's capped logged-out view — see the MIRROR RULE in scout/README.md: a Threads post mirroring an already-saved X post is never picked on its own."
+  - handle: terries.ai
+    profile_url: https://www.threads.com/@terries.ai
+    role: releases_and_rumors
+    notes: "Added 2026-10-26 by user (Threads link). Beat/role not yet verified — classify each post on its merits (release/rumor/find), do not assume. Followed by the user 2026-10-26 (verified in the linked account's following list the same day) — resolvable from the following list from the next run. If he ever drops out of the following list, a run must report him as unresolvable rather than guessing his numeric ID or scraping threads.com. Threads search for his handle returns no posts, so search is not a resolution route."
