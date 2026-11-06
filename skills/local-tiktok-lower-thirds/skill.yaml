@@ -1,0 +1,22 @@
+name: local_tiktok_lower_thirds
+title: Local tiktok lower thirds
+description: This skill should be used when the user asks to "make an animated lower third", "add lower thirds", "create a name tag/name lower third", "build broadcast titles", "animate a title/name/role caption", "do a speaker name overlay", or "template lower thirds across a list of names". Covers enter/exit animation (slide/wipe/mask reveal), in/out timing & dwell, safe-area & broadcast conventions, name-vs-role type hierarchy, brand styling, and rendering one design across many names.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  status: retired
+  evidence_handles:
+  - 5fe1e4195d8d95a0615683fc7127cf5890963803ce985ebe7bef4c82ad396948
+  - d71ec13db1cebcddabd9518e7ff829e94d3648da9221cd9076bec7a52b66e8e1
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: No session in the window routes a lower third request to the retired skill; the merged local_lower_thirds skill serves them.
+    window_days: 21
+  needs_review: false
+  rationale: 'Retirement half of the lower thirds consolidation: local_tiktok_lower_thirds is superseded by the merged local_lower_thirds skill, proposed in the same batch under the same finding. Its distinct vertical video method is preserved in the merged skill and its runnable component remains reachable from the retired folder on disk.'
+  review_after: 2026-11-15T13:39:16.882721+00:00
+  reviewed_at: 2026-10-25T13:39:16.882721+00:00
+  run_id: sirun_5e45decd157943f687ec423f44ce3785
