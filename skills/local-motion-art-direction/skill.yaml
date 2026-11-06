@@ -1,0 +1,24 @@
+name: local_motion_art_direction
+title: Local motion art direction
+description: Direct a motion piece and fix motion that feels stiff, floaty, or inconsistent by locking one motion language, choosing physical timing and easing, and ranking what earns motion before any frame is animated.
+category: Creation
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  status: active
+  needs_review: false
+  evidence_handles:
+  - 744a6e06dc6bcfcfffac2c02bd43f4a877c4708b310f0a0795920382eee0bf98
+  - bbbe2c9e1949dc124515190a1ea17fc8f85e7d11910887fd9ef1645136cee98d
+  - cc362212-2110-45c7-9c64-692e0fc9e280
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: Requests for motion direction, easing, timing, or animation diagnosis in the window are served by local_motion_art_direction, with no session routing to the retired local_animation_principles trigger phrases and no transcript evidence of confusion between the two skills.
+    window_days: 21
+  rationale: The inventory lists 17 active learned skills, which triggers consolidation before any new skill. Local motion art direction and local animation principles teach the same craft under two names. Both define the same three layers under different names, Hero Support Texture versus Primary Secondary Ambient, both set easing families and timing scales, and both define motion personalities and restraint. Shot composition stays separate because it covers grids, focal placement, and camera moves, and the pipeline motion language stays separate because it carries channel specific tokens and safe areas. The window otherwise shows healthy operation with 0 failed cron runs and the daily pipeline run cc362212 succeeded, and the 88 tool failures carry generic terminal reasons with no error text attributable to a skill. The deterministic handoff suppression and goals bookkeeping hypotheses target objective loop surfaces this loop never changes, and the October 27 pipeline fixes already landed in code and templates, so no new skill is proposed.
+  review_after: 2026-11-18T13:34:38.527206+00:00
+  reviewed_at: 2026-10-28T13:34:38.527206+00:00
+  run_id: sirun_3df294c270af41919c5d3c8d8b0c9fd3
