@@ -1,0 +1,10 @@
+name: local_logo_animation
+title: Local logo animation
+description: This skill should be used when the user asks to "animate our logo", "make a logo intro/stinger", "build a brand reveal", "create an app splash animation", "loop a loader logo", "draw on our SVG mark", "morph an icon into the wordmark", or "sync the logo to a sound-logo". Covers web (SVG/Lottie), video, and app-splash delivery.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
