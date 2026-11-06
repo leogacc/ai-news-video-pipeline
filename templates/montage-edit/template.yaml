@@ -1,0 +1,103 @@
+# Montage edit — template (created 2026-10-27, first test: China AI crash)
+# Adapted from the @wakemorrow rapid-fire evidence montage (11s TikTok):
+# a flag sting over the opening shots, then half-second hard-cut
+# proof-point shots. No music, no narration, no title overlay.
+id: montage-edit
+name: Montage edit
+is_main: false
+based_on: clips  # same delivery specs and visual rules, different grammar
+
+layout:
+  portrait_only: true  # NEVER landscape
+  width: 1080
+  height: 1920
+  fps: 30
+  codec: H.264 High L4.0, yuv420p, faststart
+  duration_seconds: 11
+  audio: source audio on news-reporter/broadcast shots only, silence elsewhere (v7 rule: reporter voice plays on CNBC shots; no music, no narration, no bed; v8 rule: reporter/broadcast shots are 4.0s each with source audio, all other shots 0.5s, total duration = 0.5 x non-reporter shots + 4.0 x reporter shots = 21.5s for a 3-reporter cut)
+
+structure:
+  shot_length_seconds: 0.5
+  shot_count: 22
+  reporter_shots: 4.0s each with source audio (v8 standing rule); all other shots 0.5s; total = 0.5 x non-reporter + 4.0 x reporter
+  v9_centerpiece: a single featured reporter clip as the centerpiece (the CSI300 bear-market segment, 4.0s, placed first in the crash section immediately after the heatmap pivot), with the other reporter clips cut — do not re-add cut reporter segments
+  v10_centerpiece: the featured reporter clip must contain one complete important sentence (adjust its length to the sentence — v10: 13.6s for the 5.2–18.4s index sentence), and it sits late in the video (second-to-last, before the closing frame), not right after the pivot
+  sting_0_to_2s:
+    description: FLAG overlay (never a logo) scaling smoothly from small
+      and centered to large across the opening shots, then gone at the
+      first body cut at 2s. The template takes any flag per story; the
+      flag asset must be visually verified before use (correct colours
+      and emblem arrangement) — never ship an unverified or wrong flag.
+    start_width_px: 240
+    end_width_px: 900
+    position: centered, both axes
+  shot_order:
+    - pics_first: shots 1-4 (0-2s) are still pictures, flag sting over them
+    - then_mainly_video: shots 5-22 (2-11s) are video clips, with one
+      designed comparison card per proof point interleaved
+  cuts: hard cuts ONLY — no fades or wipes. Slow zooms inside a shot
+    are allowed (as in the reference: slow zoom on a post screenshot).
+  end: darken the last shot (eq brightness around -0.2) so the final
+    frame is visibly dimmed but still above the blackdetect threshold —
+    never a fully black segment.
+
+text:
+  rule: only what is inside source screenshots and designed comparison
+    cards (numbers, prices, times). No separate title overlay, no
+    subtitles, no narration, no invented figures.
+  no_pure_text_shots: text may appear only INSIDE a visual (chart,
+    banner, ticker, callout, market panel); a shot that is only text
+    on a background is banned even at 1-2 lines — if no real
+    chart/visual carries a figure, drop the figure and record the
+    drop, never a text-only shot.
+  cards:
+    style: full-frame black background, white bold text, big number
+      centered, short label below, all text inside a 60px margin
+    content: verified figures only, each card traceable to the source
+      article; attribute third-party figures on the card (e.g. Goldman
+      Sachs) where the figure is theirs.
+
+sourcing:
+  pictures: vision-cropped source screenshots (article header, article
+    text crops) — kicker + headline + dek where applicable, no site
+    chrome, no login walls, no verification/CAPTCHA pages. A real
+    chart screenshot only from a credible outlet; NEVER a fabricated
+    chart — if no real chart/visual carries a figure, drop the figure
+    and record the drop; never a text-only shot (see text.no_pure_text_shots).
+  video: literal stock footage only (trading floor, ticker screens,
+    exchange exteriors, market boards, factory/robot footage matching
+    the company in the story) plus any real source footage. No
+    metaphor queries, no Commons/stock for evidence.
+  illustrative_photos: stock photos are illustrative scene-setting
+    only (e.g. a skyline), never evidence.
+
+watermark:
+  text: "@leos.logos"
+  style: DejaVuSans-Bold 34pt, white 50% opacity, top-left x=60 y=190,
+    every frame including the sting segment.
+
+qa_gates_mandatory:
+  - ffprobe clean: h264, 1080x1920, 30fps, video + AAC audio (reporter shots only, silence elsewhere)
+  - exactly 22 shots at 0.5s boundaries (330 frames at 30fps)
+  - flag scale verified on stills at ~0s (small), ~1s (mid), ~2s
+    (large), and gone at the 2s cut
+  - every card's text fully in frame
+  - portrait dimensions confirmed (width=1080, height=1920)
+  - blackdetect clean (the darkened last shot must stay above threshold)
+  - last frame darkened but visible
+  - stills eye-verified at start, middle, and end
+
+output:
+  folder: pipeline/output/scout/clips/<YYYYMMDD>_<slug>/
+  files: clip.mp4, shots.json, description.txt, meta.json
+  records: template name, full shot list with timestamps, flag asset
+    note, QA evidence. A template test is MANUAL, not a scout pick:
+    do NOT append to scout/saved_items.json, scout/clipped_finds.json,
+    or scout/state.json, and do NOT touch daily digest outputs or
+    daily state.
+
+publish:
+  telegram: video + description in the pipeline's normal pattern.
+    Description must say it is a TEMPLATE TEST of "montage edit",
+    carry the facts + source link + a viewer question + exactly 5
+    hashtags as the final line, and never claim the video is an AI.
