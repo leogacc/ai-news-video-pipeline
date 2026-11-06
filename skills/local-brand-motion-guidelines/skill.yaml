@@ -1,0 +1,10 @@
+name: local_brand_motion_guidelines
+title: Local brand motion guidelines
+description: This skill should be used when the user asks to "write motion guidelines", "create a brand motion system", "define easing and timing tokens", "document our animation principles", "build a motion language like Slack/IBM/Klarna", "set up entrance/exit/transition rules", or "add a reduced-motion / accessibility section". It outputs a fill-in-ready brand motion guidelines document.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
