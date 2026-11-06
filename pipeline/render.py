@@ -167,11 +167,11 @@ def frame_layout(src, W, H, out_path, landscape=False, max_w=None,
     pillars, no black bars. Anything else gets a BLURRED background made
     from its own colours: the image scaled to cover the frame, heavily
     blurred and darkened, with the sharp image fit inside the visual zone
-    (y 0..1400, above the caption fade) on top of it.
+    (y 0..1490, above the caption fade) on top of it.
     Document shots (articles, tables, posts) NEVER cover-crop — a cover
     crop would slice headline text, which the 2026-10-20 vision-crop
     standard forbids. They always take the fit + blurred-background
-    path, darkened harder so the text foreground still pops.
+    path.
     The caption zone itself is handled in Pass 2 (a pure-black gradient
     overlay), so the blurred background never fights the captions.
     Returns the path ffmpeg should use.
@@ -255,10 +255,15 @@ def frame_layout(src, W, H, out_path, landscape=False, max_w=None,
     by = (bg.height - H) // 2
     bg = bg.crop((bx, by, bx + W, by + H))
     bg = bg.filter(ImageFilter.GaussianBlur(radius=max(20, W // 27)))
-    bg = ImageEnhance.Brightness(bg).enhance(0.45 if doc else 0.70)
-    # Foreground fits the visual zone only: full width, y 0..1400
-    # (in 1920 coords), so it never sits under the caption fade.
-    box_w, box_h = W, int(1400 * H / 1920)
+    bg = ImageEnhance.Brightness(bg).enhance(0.70)
+    # Foreground fits the visual zone only: full width, y 0..1490
+    # (in 1920 coords), VERTICALLY CENTRED in the zone (2026-10-26,
+    # user: mid content was way too low, should sit visually in the
+    # middle). The 2026-10-25 bottom-anchor overshot: it hugged every
+    # short card to the caption fade and left the top half as blur.
+    # Centring balances the space above and below the sharp content.
+    # Tall images are unaffected (fg height ~= box height).
+    box_w, box_h = W, int(1490 * H / 1920)
     s = min(box_w / iw, box_h / ih)
     fg = im.resize((max(1, int(iw * s)), max(1, int(ih * s))),
                    Image.LANCZOS)
@@ -269,13 +274,15 @@ def frame_layout(src, W, H, out_path, landscape=False, max_w=None,
 
 def caption_gradient_png(dest, W=1080):
     """Pure-black caption area with a fading (not solid) top edge
-    (2026-10-23, user). Returns a 1080x540 RGBA PNG meant to be overlaid
-    at y=1380: alpha ramps 0 -> 255 over the first 70px with a smoothstep
+    (2026-10-23, user; fade moved 1380 -> 1430 in 2026-10-25 deadspace
+    fix). Returns a 1080x490 RGBA PNG meant to be overlaid
+    at y=1430: alpha ramps 0 -> 255 over the first 70px with a smoothstep
     (so the edge reads as a soft blur, never a hard line), then stays
-    solid black to the bottom of the frame (y=1920). Captions start at
-    y=1450, i.e. just below the fade, on pure black."""
+    solid black to the bottom of the frame (y=1920). Caption glyphs
+    (first row ~1521+) sit on solid black, since the fade completes
+    at y=1500."""
     from PIL import Image
-    fade, total_h = 70, 1920 - 1380
+    fade, total_h = 70, 1920 - 1430
     img = Image.new("RGBA", (W, total_h), (0, 0, 0, 255))
     px = img.load()
     for y in range(fade):
@@ -1320,7 +1327,7 @@ def main():
                 # to 9:16 cover-fill the frame; everything else gets a
                 # blurred background from its own colours (same rule as
                 # frame_layout for photos) with the sharp clip fit inside
-                # the visual zone (y 0..1400). No black bars.
+                # the visual zone (y 0..1490). No black bars.
                 # Analytical animations (2026-10-10): MUST sit below the
                 # watermark/badge (badge bottom y=278) — pad y=290, no overlap
                 # with badge, watermark, or captions; they keep the old path.
@@ -1352,8 +1359,9 @@ def main():
                     # captions; cover-filling it to 1080x1920 stretches
                     # it to full height and pushes its bottom row
                     # under the caption black area. Force the blur-pad
-                    # path for selfplug clips, so the group stays in
-                    # y 0..1400 and fully visible above the captions.
+                    # path for selfplug clips, so the group stays
+                    # centred in the visual zone and fully visible
+                    # above the captions.
                     if _sa and _loss <= 0.30 and "selfplug_" not in v["path"]:
                         vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,"
                               f"crop={w}:{h},fps={fps},setsar=1")
@@ -1361,13 +1369,21 @@ def main():
                         # Blur-pad: background is the clip itself, scaled
                         # down, blurred, scaled back up (cheaper than a
                         # full-res blur per frame) and darkened; the sharp
-                        # clip sits centred in the visual zone on top.
+                        # clip sits CENTRED in the visual zone
+                        # (2026-10-26: bottom-anchoring pushed mid content
+                        # too low; selfplug keeps the bottom-anchor).
+                        # 2026-10-26 (user: mid content visually in the
+                        # middle): sharp clip CENTRED in the visual zone,
+                        # except selfplug, which keeps its bottom-anchor
+                        # so the brand montage still ends at y1490.
+                        _ov_y = ("1490-h" if "selfplug_" in v["path"]
+                                 else "(1490-h)/2")
                         vf = (f"split[bs][fs];"
                               f"[bs]scale=540:960:force_original_aspect_ratio=increase,"
                               f"crop=540:960,gblur=sigma=20,scale={w}:{h},"
                               f"eq=brightness=-0.18[bg0];"
-                              f"[fs]scale={w}:1400:force_original_aspect_ratio=decrease"
-                              f"[fg0];[bg0][fg0]overlay=(W-w)/2:(1400-h)/2,"
+                              f"[fs]scale={w}:1490:force_original_aspect_ratio=decrease"
+                              f"[fg0];[bg0][fg0]overlay=(W-w)/2:{_ov_y},"
                               f"fps={fps},setsar=1")
             # Analytical/self-plug clips (2026-10-10): play ONCE then HOLD the
             # last frame — never loop (the loop restart was the ugly cut at
@@ -1767,11 +1783,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         print(f"[render] {len(emph_events)} emphasis pills (timed + face-aware)")
     if grad_path and not LANDSCAPE:
         # Gradient in the SAME encode as captions: video chain is
-        # overlay (black fade at y=1380) -> tpad -> ASS captions ->
+        # overlay (black fade at y=1430) -> tpad -> ASS captions ->
         # watermark -> emphasis ASS, all in one filter_complex with the
         # audio filter. Gradient input index = 2 without music, 3 with.
         gidx = 3 if music else 2
-        vchain = (f"[0:v][{gidx}:v]overlay=0:1380:format=yuv420,"
+        vchain = (f"[0:v][{gidx}:v]overlay=0:1430:format=yuv420,"
                   f"format=yuv420p")
         if vf_parts:
             vchain += "," + ",".join(vf_parts)
