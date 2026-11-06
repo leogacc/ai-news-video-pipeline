@@ -198,9 +198,13 @@ def fingerprint(text: str) -> str:
     # Breaking!-chunk merge below changed the audio for identical text —
     # without a key change the cold open would serve the stale two-chunk
     # delivery from cache forever.
+    # 2026-11-03: code 3 — warm-up trim + comma pauses change the audio.
+    # code 4 — comma-pause detector correction (thresh/window/run).
+    # 2026-11-05: code 5 — comma-pause detector window starts AT the
+    # word end (pre-end fricative tails no longer count as pause).
     key = json.dumps({"t": text, "v": T["voice"], "s": T.get("speed", 1.0),
                       "l": T["lang_code"], "sr": T["sample_rate"],
-                      "code": 2},
+                      "code": 5},
                      sort_keys=True)
     return hashlib.sha1(key.encode()).hexdigest()[:16]
 
@@ -218,33 +222,46 @@ def _pipeline():
     return _PIPE
 
 
-def synth_segment(text: str):
-    """-> (wav, words, sentences), all segment-relative.
+# 2026-11-03 FIRST-WORD ONSET + COMMA PAUSES (user: the voice sometimes
+# skips a sentence's first word, and sometimes rushes past a comma).
+# Root causes, both measured on the 2026-11-03 PLE clip:
+# - Kokoro renders a segment's FIRST token with a soft onset: the first
+#   ~40ms of a segment-initial word is digital silence, so a short first
+#   word ("The" 75ms, "It's" 125ms) is inaudible on a phone speaker and
+#   sounds skipped. Mid-sentence words attack cleanly. Fix: synthesize
+#   with a disposable discourse marker ("Well,") absorbing the soft
+#   onset, then trim it — the real first word then starts at full
+#   energy (verified: "the" attacks in its first 20ms window).
+# - Kokoro pauses after SOME commas (first list item, clause commas)
+#   but rushes past others (later list items, appositives: "layouts,",
+#   "switchboards,", "electrical,", "civil,", "model," all measured
+#   with no >=0.12s silence). Fix: after alignment, splice 0.22s of
+#   silence after every comma that lacks a pause, shifting later
+#   word times. Existing pauses are left untouched.
+_WARMUPS = ["Well,", "Okay,", "Hmm,"]
+_COMMA_PAUSE_SEC = 0.22
+_LEAD_SILENCE_SEC = 0.12
+_FADE_MS = 5
 
-    words: [(word, start, end)] — script words, TTS-measured timings.
-    sentences: [{text, start, duration}] sliced from the word stream.
 
-    The cold-open "Breaking" is synthesized from the exclaimed variant
-    (_tts_text) and captioned from the punctuation-free variant
-    (_caption_text); see above.
-    """
-    tts_input = _tts_text(text)
-    caption_input = _caption_text(text)
-    pipeline = _pipeline()
-    sents = split_sentences(tts_input)
-    # 2026-10-18 VOICE CONTINUITY (user: the exclaimed "Breaking!"
-    # sounded like a different voice): as its own synthesis chunk Kokoro
-    # resets prosody for the one-word exclamation. Keep it in the SAME
-    # chunk as the sentence that follows — the "!" still buys exclamation
-    # energy + a pause, but the voice stays continuous.
-    if len(sents) > 1 and sents[0].rstrip() == "Breaking!":
-        sents = ["Breaking! " + sents[1]] + sents[2:]
-    sr = T["sample_rate"]
+def _pick_warmup(caption_input: str) -> str:
+    words = caption_input.split()
+    first = words[0].strip(",.!?;:") if words else ""
+    for w in _WARMUPS:
+        if norm_w(w) != norm_w(first):
+            return w
+    return _WARMUPS[0]
+
+
+def _synth_chunks(pipeline, input_text: str, sr: int):
+    """Run Kokoro on input_text, tighten each chunk. -> (wav, tts_words,
+    n_results). tts_words are word-level (word, start, end) in
+    concatenated time."""
     wav_parts, tts_words = [], []
     t = 0.0
     n_results = 0
-    for res in pipeline("\n".join(sents), voice=T["voice"],
-                       speed=T.get("speed", 1.0)):
+    for res in pipeline(input_text, voice=T["voice"],
+                        speed=T.get("speed", 1.0)):
         n_results += 1
         audio = res.audio
         if audio is None:
@@ -266,7 +283,147 @@ def synth_segment(text: str):
         t += len(tight) / sr
     wav = (np.concatenate(wav_parts) if wav_parts
            else np.zeros(sr, dtype=np.float32))
+    return wav, tts_words, n_results
+
+
+def _trim_warmup(wav, tts_words, warmup, sr):
+    """Drop the warm-up word from audio + word list. Returns (wav, words)
+    or None if the warm-up word is not the first token — the caller then
+    falls back to plain synthesis, so warm-up audio is never shipped."""
+    if not tts_words or len(tts_words) < 2:
+        return None
+    if norm_w(tts_words[0][0]) != norm_w(warmup):
+        return None
+    cut = tts_words[1][1]
+    idx = int(round(cut * sr))
+    if idx <= 0 or idx >= len(wav):
+        return None
+    out = wav[idx:].copy()
+    # 5ms raised-cosine fade-in kills the splice click; inaudible.
+    nfade = max(1, int(_FADE_MS / 1000.0 * sr))
+    ramp = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, nfade))
+    out[:nfade] *= ramp
+    lead = np.zeros(int(_LEAD_SILENCE_SEC * sr), dtype=np.float32)
+    out = np.concatenate([lead, out])
+    shift = _LEAD_SILENCE_SEC - cut
+    words = [(w, round(s + shift, 3), round(e + shift, 3))
+             for w, s, e in tts_words[1:]]
+    return out, words
+
+
+def _has_pause(wav, sr, b, thresh=0.005):
+    """True if a >=0.15s near-silent run starts at/after boundary b (seconds).
+
+    2026-11-03 detector correction (v3 lesson): the first version used
+    thresh 0.015 and window [b-0.20, b+0.10] — wide enough to chain the
+    previous word gap + a fricative tail (0.011-0.015) into a fake
+    >=0.12s "pause", so it skipped insertion for commas whose real
+    pause was only ~0.08s (PLE v3 "layouts,"). Then: thresh 0.005
+    (true pause floors are 0.000-0.005; audible tails are 0.01+) and
+    window [b-0.10, b+0.30] (a full word away from the previous gap).
+    2026-11-05 detector correction (v2026.11.05.1, traced on the Nov 5
+    cyber clip): the [b-0.10, b+0.30] window still counts up to 0.10s
+    of the word's OWN quiet fricative tail as pause — a word ending in
+    a quiet tail ("itself", "first", "real") can chain its pre-end
+    quiet with a short real pause to reach 0.15s, so the detector
+    skipped insertion while the real post-word silence was only
+    0.04-0.12s (9 of 13 commas on the cyber clip's first check; the
+    verdict was even phase-sensitive at the boundary, flipping between
+    b=6.808 and b=6.81). Now the window starts AT b: [b, b+0.30] —
+    only silence after the word end counts. A >=0.15s span below
+    -46dB after the word IS a pause by definition, so skipping then
+    is correct; anything shorter gets the inserted 0.22s."""
+    lo = max(0, int(b * sr))
+    hi = min(len(wav), int((b + 0.30) * sr))
+    seg = np.abs(wav[lo:hi])
+    win = max(1, int(0.02 * sr))
+    n = len(seg) // win
+    if n == 0:
+        return False
+    rms = np.sqrt(np.mean(seg[:n * win].reshape(n, win) ** 2, axis=1))
+    run = 0
+    for r in rms:
+        run = run + 1 if r < thresh else 0
+        if run * 0.02 >= 0.15:
+            return True
+    return False
+
+
+def _splice_silence(wav, sr, b, dur):
+    """Insert dur seconds of silence at the zero-crossing nearest b,
+    with 2ms fades on both audio edges to avoid clicks."""
+    idx = int(round(b * sr))
+    lo = max(1, idx - int(0.04 * sr))
+    hi = min(len(wav) - 1, idx + int(0.04 * sr))
+    best, bestv = idx, None
+    for j in range(lo, hi + 1):
+        v = abs(wav[j])
+        if bestv is None or v < bestv:
+            best, bestv = j, v
+    j = best
+    nfade = max(1, int(0.002 * sr))
+    left = wav[:j].copy()
+    right = wav[j:].copy()
+    if len(left) >= nfade:
+        left[-nfade:] *= (0.5 + 0.5 * np.cos(np.linspace(0, np.pi, nfade)))
+    if len(right) >= nfade:
+        right[:nfade] *= (0.5 - 0.5 * np.cos(np.linspace(0, np.pi, nfade)))
+    sil = np.zeros(int(round(dur * sr)), dtype=np.float32)
+    return np.concatenate([left, sil, right])
+
+
+def _ensure_comma_pauses(wav, words, sr):
+    """Splice a pause after every comma lacking one. Words are
+    (word, start, end); returns (wav, words) with later times shifted."""
+    out_words = []
+    shift = 0.0
+    for w, s, e in words:
+        s2, e2 = round(s + shift, 3), round(e + shift, 3)
+        out_words.append((w, s2, e2))
+        if w.endswith(","):
+            if not _has_pause(wav, sr, e2):
+                wav = _splice_silence(wav, sr, e2, _COMMA_PAUSE_SEC)
+                shift += _COMMA_PAUSE_SEC
+    return wav, out_words
+
+
+def synth_segment(text: str):
+    """-> (wav, words, sentences), all segment-relative.
+
+    words: [(word, start, end)] — script words, TTS-measured timings.
+    sentences: [{text, start, duration}] sliced from the word stream.
+
+    The cold-open "Breaking" is synthesized from the exclaimed variant
+    (_tts_text) and captioned from the punctuation-free variant
+    (_caption_text); see above.
+
+    2026-11-03: warm-up trim (first-word onset) + comma-pause guarantee
+    run inside every synthesis; see helpers above.
+    """
+    tts_input = _tts_text(text)
+    caption_input = _caption_text(text)
+    pipeline = _pipeline()
+    sents = split_sentences(tts_input)
+    # 2026-10-18 VOICE CONTINUITY (user: the exclaimed "Breaking!"
+    # sounded like a different voice): as its own synthesis chunk Kokoro
+    # resets prosody for the one-word exclamation. Keep it in the SAME
+    # chunk as the sentence that follows — the "!" still buys exclamation
+    # energy + a pause, but the voice stays continuous.
+    if len(sents) > 1 and sents[0].rstrip() == "Breaking!":
+        sents = ["Breaking! " + sents[1]] + sents[2:]
+    sr = T["sample_rate"]
     script_words = caption_input.split()
+    warmup = _pick_warmup(caption_input)
+    wav, tts_words, n_results = _synth_chunks(
+        pipeline, warmup + " " + "\n".join(sents), sr)
+    trimmed = _trim_warmup(wav, tts_words, warmup, sr)
+    if trimmed is None:
+        # Warm-up word did not come out first — never ship it.
+        print("[tts] warm-up trim failed, plain synthesis fallback")
+        wav, tts_words, n_results = _synth_chunks(
+            pipeline, "\n".join(sents), sr)
+    else:
+        wav, tts_words = trimmed
     if not tts_words or n_results == 0:
         print("[tts] WARNING: no TTS token timings — even word distribution")
         step = (len(wav) / sr) / max(1, len(script_words))
@@ -274,6 +431,7 @@ def synth_segment(text: str):
                  for i, w in enumerate(script_words)]
     else:
         words = align_words(script_words, tts_words)
+        wav, words = _ensure_comma_pauses(wav, words, sr)
     sentences, wi = [], 0
     for sent in sents:
         n = len(sent.split())
