@@ -1,0 +1,21 @@
+name: local_chart_animation
+title: Local chart animation
+description: This skill should be used when the user asks to "make a bar chart race", "turn a CSV into a video", "build an animated data visualization", "create an animated statistics video", "animate a chart/graph", "make a number counter/ticker", "animate a ranking over time", or "batch-render one chart template across many datasets". Covers data-driven keyframing, value interpolation, rank transitions, counters, pacing, annotation, and template×data batch output.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: false
+  status: retired
+  evidence_handles:
+  - 3251f127e63df6202fd1f24e59443c34845e58fa680d989878f66b99332dac38
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: No session in the window routes a chart-animation request to the retired skill; the merged skill serves them.
+    window_days: 21
+  rationale: 'Retirement half of the data-visualization consolidation: local_chart_animation is superseded by local_animated_data_visualization, proposed in the same batch under the same finding.'
+  review_after: 2026-11-09T13:44:05.903178+00:00
+  reviewed_at: 2026-10-19T13:44:05.903178+00:00
+  run_id: sirun_70094e19caad4201a7b8249bac3721eb
