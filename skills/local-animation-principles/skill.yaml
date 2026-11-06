@@ -1,0 +1,23 @@
+name: local_animation_principles
+title: Local animation principles
+description: This skill should be used when the user asks to "make this animation feel natural", "fix motion that feels stiff/floaty/cheap", "my animation looks robotic", "choose an easing curve", "how do I use the Graph Editor", "add overshoot or bounce", "Easy Ease isn't enough", "make snappy motion", "pick a duration for this transition", "stagger a list animation", "sync animation to a beat", or "review motion for good timing". It is the tech-agnostic foundation for deciding how something should move.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  status: retired
+  needs_review: false
+  evidence_handles:
+  - 744a6e06dc6bcfcfffac2c02bd43f4a877c4708b310f0a0795920382eee0bf98
+  - bbbe2c9e1949dc124515190a1ea17fc8f85e7d11910887fd9ef1645136cee98d
+  - cc362212-2110-45c7-9c64-692e0fc9e280
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: No session in the window routes a motion direction or animation timing request to the retired skill, and the merged local_motion_art_direction skill serves them.
+    window_days: 21
+  rationale: Retirement half of the motion consolidation. Local animation principles is superseded by the updated local_motion_art_direction skill proposed in the same batch under the same finding, which preserves its easing curves, timing scales, stagger rules, anticipation and follow-through, beat sync, spring guidance, and diagnosis. Its reference files remain reachable from the retired folder on disk.
+  review_after: 2026-11-18T13:34:38.527206+00:00
+  reviewed_at: 2026-10-28T13:34:38.527206+00:00
+  run_id: sirun_3df294c270af41919c5d3c8d8b0c9fd3
