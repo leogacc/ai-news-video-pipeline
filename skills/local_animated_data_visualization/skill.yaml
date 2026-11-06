@@ -1,0 +1,25 @@
+name: local_animated_data_visualization
+title: Animated data visualization
+description: Animate infographics, charts, and diagrams for web or video, from bar chart races and count-up stats to sequenced icon reveals and step-by-step diagram builds.
+category: Creation
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  status: active
+  evidence_handles:
+  - 8255fb269304cea2677b27ae2687ee5f53b9d74d9cc3032add8c23e1c030d64f
+  - 3251f127e63df6202fd1f24e59443c34845e58fa680d989878f66b99332dac38
+  - b30974fda9607e84d42921adb3281a6accb8e5739cc60915506ecc3e1b9feaa8
+  - ca39a2c4-e638-46dd-9da8-3b356a8649bc
+  measurement:
+    proxy_metric_id: skill_routing_accuracy
+    success_criterion: Requests for animated infographics, charts, or diagrams in the window are served by local_animated_data_visualization, with no session invoking a retired skill's trigger phrases and no transcript evidence of confusion between the retired skills.
+    window_days: 21
+  needs_review: false
+  rationale: 'The run brief lists 21 active learned skills, which triggers the consolidation rule. Three of them teach the same craft under different names: local_animated_infographic (staggered icon pops, eased count-up key numbers, draw-on connectors, Remotion stills-verify loop), local_chart_animation (bar chart races, eased count-ups with rounded Intl.NumberFormat tabular-nums, frame-driven values, stills-verify loop), and local_diagram_animation (node/edge/label reveals, draw-on edges, count-ups, bar/line chart recipes). Their SKILL.md bodies repeat the same mechanisms: drive every value from the current frame, round before formatting, ease the value not just the opacity, and verify with frozen frames before encoding. The infographic skill even points at chart-animation for heavy charting, so the boundary is artificial and splits discovery for one kind of request. Merging them into one broader skill removes the near-duplicate trigger phrases while preserving every distinct method (composed infographics, data-driven charts, diagram reveals, web and video build tools) and keeps the runnable recipes reachable via the retired folders on disk. Deterministic candidates were reviewed and rejected: the repeated_handoff_suppression candidates target objective-loop trigger cadence/policy and the goals_bookkeeping recurring_failure targets the objective-loop prompt, both system surfaces this loop never changes. The 7 new audit-worthy runs show healthy operation (muse-video-pipeline-daily run ca39a2c4-e638-46dd-9da8-3b356a8649bc succeeded; the two user correction waves landed as versioned pipeline upgrades v2026.10.18.2/3 through the existing local-pipeline-upgrade skill; the 2026-10-19 portrait-generator outage was handled per the standing ship-degraded-and-name-it rule). The 27 subagent/tool failures carry no error text in the packet and deeper reads (muse.db, muse.exec) were denied by tool policy, so no skill-attributable pattern could be grounded and no new skill is proposed from them.'
+  review_after: 2026-11-09T13:44:05.903178+00:00
+  reviewed_at: 2026-10-19T13:44:05.903178+00:00
+  run_id: sirun_70094e19caad4201a7b8249bac3721eb
