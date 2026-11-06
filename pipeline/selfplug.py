@@ -187,6 +187,43 @@ def main():
         if kind == "file":
             try:
                 lg = _Im.open(val).convert("RGBA")
+                # LOGO VISIBILITY (2026-10-24, user: JPMorgan logo was
+                # dark and unreadable on the black right column).
+                # The self-plug right column is pure black, so a dark
+                # logo pasted as-is is invisible — that is what shipped
+                # (JPMorgan: 100% of logo pixels darker than 80/255).
+                # Two transforms, file logos only (glyphs are already
+                # white line icons and must NOT be touched):
+                # 1. Key out a solid white background (>50% near-white
+                #    pixels, e.g. AWS) so the logo does not render as
+                #    a white box — the mark itself is what is shown.
+                # 2. If the remaining mark is dark (mean luminance of
+                #    opaque pixels < 110), render it as a WHITE variant
+                #    (RGB=white, alpha kept): the standard white-logo
+                #    treatment, legible on black, shape preserved.
+                #    Light/multicolour marks (DeepSeek, Google) are
+                #    left exactly as supplied.
+                import numpy as _np
+                _a = _np.array(lg).astype(float)
+                _alpha = _a[:, :, 3]
+                _white = ((_a[:, :, 0] > 240) & (_a[:, :, 1] > 240)
+                          & (_a[:, :, 2] > 240) & (_alpha > 230))
+                if _white.mean() > 0.5:
+                    _a[_white, 3] = 0
+                    lg = _Im.fromarray(_a.astype("uint8"), "RGBA")
+                    _a = _np.array(lg).astype(float)
+                    _alpha = _a[:, :, 3]
+                _mask = _alpha > 25
+                if _mask.any():
+                    _lum = (0.299 * _a[:, :, 0] + 0.587 * _a[:, :, 1]
+                            + 0.114 * _a[:, :, 2])
+                    if _lum[_mask].mean() < 110:
+                        _a[_mask, 0] = 255
+                        _a[_mask, 1] = 255
+                        _a[_mask, 2] = 255
+                        lg = _Im.fromarray(_a.astype("uint8"), "RGBA")
+                        print(f"[selfplug] logo whitened (dark on "
+                              f"black): {val}")
                 lg.thumbnail((max_w, max_h), _Im.LANCZOS)
                 return lg
             except Exception:
