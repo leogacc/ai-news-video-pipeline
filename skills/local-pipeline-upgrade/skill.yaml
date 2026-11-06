@@ -1,0 +1,10 @@
+name: local_pipeline_upgrade
+title: Local pipeline upgrade
+description: 'How to upgrade the AI-news video pipeline so the change actually lands as a new version everyone uses: implement + verify the code change, bump pipeline/VERSION, append pipeline/CHANGELOG.md, and sync any worker-instruction changes through cron.update (never by editing the cron .md file). Use whenever the user says ''upgrade the pipeline'', asks for a pipeline-level fix, or reports that a video is missing a pipeline upgrade.'
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
