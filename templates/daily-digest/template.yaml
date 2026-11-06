@@ -38,6 +38,19 @@ style:
     background: pure black
     fade: 70px smoothstep at y 1380..1450
     text_top_y: 1450
+  vertical_zones:
+    rule: UNIFIED ZONES (2026-10-25, from the REA v2/v3 and GPU v4 fixes — same rule as templates/clips/template.yaml unified_vertical_zones, adapted to digest format). Frame 1080x1920. Captions are FIXED at the bottom (text_top_y 1450, first glyph row ~1521+) and never move; mid content is NEVER too high, so no shot may end its visual high and leave a black band above the captions.
+    deep_dives_and_hooks: hook heroes and deep-dive visuals fill the frame. Padded / blur-pad shots extend their sharp visual down to y1490 — this supersedes any older y0..1400 sharp-image cap for deep-dive shots. Cover-fill shots fill the full frame.
+    text_stacks: any title / bio / analytical text stack follows the clips stack rule — its bottom sits within ~25px of the first caption glyph row, never overlapping the captions, and never riding high in the frame.
+    measurable_check: on final-render frames (hooks, each deep dive, self-plug), measure the bottom row of the lowest visual/text element against the first caption glyph row. FAIL the render if a deep-dive visual ends above y1400 or the gap to the captions exceeds ~60px — shift the visual down and re-render.
+    self_plug_note: the self-plug montage is a sliding composite, not a static stack, so its window is judged by its full split shot, not by a single panel row — see self_plug_montage below.
+  watermark:
+    text: "@leos.logos"
+    font: DejaVuSans-Bold, 34pt
+    color: white at 50% opacity (ffmpeg fontcolor=white@0.5)
+    position: top-left, x=60, y=190, rect [60,190,300,228] — same row centre (y~212) as the number pills, which sit upper-right, so the two never collide
+    duration: every frame, whole video (burned in the final mux, render.py 2026-10-10) — never a single shot, never omitted
+    check: visible on final-render stills at start, middle, and end; must not sit under platform UI or overlap captions
   number_pills:
     size: 138x66
     shape: rounded rectangle, dark, 50% transparent, clean blurred edge
@@ -52,7 +65,7 @@ style:
     logos_from: script.json story_ids -> story_icons (glyphs are drawn icons, not missing-logo fallbacks)
     motion: simply slides top-to-bottom over the tall split composite, then holds the full split shot with all pairs at once
     rows: crop ONLY each character's own panel band, never a square face crop that pulls in neighbouring panels
-    cover_fill: never — self-plug clips stay in y 0..1400, above the captions
+    cover_fill: never — self-plug clips stay in y 0..1490, above the captions (first glyph row ~1521+), so the full split shot fills down toward the captions instead of ending high at y1400; the caption fade sits just above the captions, not as a hard cut at 1400
   portrait:
     type: Pixar-style group portrait, 9:16, top-to-bottom story order
     attire: each character in a DIFFERENT outfit, never all in dark suits
@@ -61,7 +74,7 @@ style:
   voice:
     engine: Kokoro
     voice: am_echo
-    speed: 1.10
+    speed: 1.20
   music: off  # temporary, user 2026-10-23; track preserved as .disabled, never add a copyrighted song
 
 visual_rules:
@@ -73,6 +86,7 @@ visual_rules:
   - no full-frame company logos in deep dives
   - evidence cannot appear before its subject is spoken; visual changes align with narration/story starts
   - analytical text above the caption zone; no mid-screen text without an analytical chart
+  - visual zone fills to the captions (see style.vertical_zones): no deep-dive shot ends its visual above y1490 leaving a black band above the captions; mid content is never too high
 
 publish:
   mode: telegram_queue
