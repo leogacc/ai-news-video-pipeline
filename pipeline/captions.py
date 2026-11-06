@@ -29,13 +29,13 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
 
-# Terminal caption design: background always black; text block top is
-# pinned to CAPTION_TOP for the whole video (top-middle of bottom third).
+# Terminal caption design: background always black; first glyph row
+# is pinned at y~1530 for the whole video (top-anchored, alignment 7).
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 FONT_SIZE = 68
 LINE_H = int(FONT_SIZE * 1.30)          # 88
 MAX_W = 1080 - 120
-CAPTION_TOP = 1450                     # text block top edge, fixed (matches intro text y=1450)
+CAPTION_TOP = 1450                     # legacy: pre-2026-10-26 bottom-anchor reference; captions now top-anchor via the style MarginV (1513)
 GREEN = "&H0014FF39"                    # #39FF14 neon (ASS &HAABBGGRR)
 
 
@@ -176,7 +176,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Terminal,DejaVu Sans Mono,{FONT_SIZE},{GREEN},&HFF000000,&HFF000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,1,60,60,1450,1
+Style: Terminal,DejaVu Sans Mono,{FONT_SIZE},{GREEN},&HFF000000,&HFF000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,7,60,60,1513,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -201,9 +201,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 if k < len(items) - 1 else 0.0
                 for k in range(len(items))]
         lines = wrap_word_indices(items, font)
-        block = len(lines) * LINE_H
-        # Pin the text block top to CAPTION_TOP for the whole video.
-        mv = max(20, (1920 - CAPTION_TOP) - block)
+        # 2026-10-26 (user: captions must be pinned like the find clips):
+        # TOP-ANCHORED captions (ASS alignment 7, one fixed style
+        # MarginV). The old bottom-anchored per-phrase MarginV ladder
+        # assumed a libass line height of 88px; libass really uses
+        # ~65-70px, so the first glyph row wandered y1470..1734 across
+        # the video. Now every event inherits the style margin and
+        # line 1 starts at the same y on every frame; extra lines grow
+        # DOWNWARD, where there is room to y1920.
         # Per-letter Dialogue lines (2026-10-12): each line shows the
         # text typed up to that letter plus block cursor, mimicking the
         # intro's frame-by-frame PIL typing. The cursor trails the typing
@@ -232,7 +237,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         winfo = {k: (items[k][0], items[k][1], gaps[k])
                  for k in range(len(items))}
         # Build visible text incrementally
-        typed = "> "
+        typed = "> "; pending_break = False
         for fi, (widx, cidx, sp_after, brk_after) in enumerate(flat):
             s, e, gap = winfo[widx]
             w = items[widx][2]
@@ -241,13 +246,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             ls = s + cidx * per_letter
             le = s + (cidx + 1) * per_letter
             ch = w[cidx]
+            # Deferred break (2026-10-26): appending the break to the
+            # line-final letter renders a cursor-only next line for
+            # 1-2 frames and jumps the block; the break moves to the
+            # next line's first letter event instead.
+            if pending_break:
+                typed += "\\N"; pending_break = False
             typed += ch
             if cidx == n - 1:
                 le += gap
                 if sp_after:
                     typed += " "
             if brk_after:
-                typed += "\\N"
+                pending_break = True
             # Cursor trails the typed text
             visible = typed + "█"
             letter_times.append((ls, le, visible))
@@ -260,7 +271,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                      if li < len(letter_times) - 1 else le)
             txt = vis.replace("{", "\\{").replace("}", "\\}")
             events.append(
-                f"Dialogue: 0,{ts(ls)},{ts(le)},Terminal,,0,0,{mv},,{txt}")
+                f"Dialogue: 0,{ts(ls)},{ts(le)},Terminal,,0,0,0,,{txt}")
 
     out = ROOT / "output" / "captions.ass"
     content = header + "\n".join(events) + "\n"
