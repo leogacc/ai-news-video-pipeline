@@ -1,0 +1,10 @@
+name: local_motion_language
+title: Local motion language
+description: Use when planning, building, or reviewing motion for the daily AI-news video pipeline (terminal aesthetic, 9:16, Kokoro narration). Defines the channel's motion personality, easing/duration tokens, what earns motion and what stays still, safe areas, and pacing budgets. Read before touching render.py, analytics.py, or the intro.
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true
