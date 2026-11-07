@@ -559,7 +559,7 @@ flowchart LR
 ### Phase 11 Exit Criteria
 - [x] `DocumentZoom` Remotion composition renders smooth scale transitions and synchronized highlighter sweeps.
 - [x] `TerminalRunner` renders authentic CLI simulations with interactive error badges.
-- [ ] Reusable HUD widgets (`StopwatchTicker`, `CurrencyTicker`) verified on live assembly runs.
+- [x] Reusable HUD widgets (`StopwatchTicker`, `GrowthPill`) verified on live assembly runs.
 - [ ] Regression test suite passing 100%.
 
 ---

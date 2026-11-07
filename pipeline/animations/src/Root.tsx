@@ -7,6 +7,8 @@ import { TweetCard3D, TweetCard3DProps } from './compositions/TweetCard3D';
 import { PersistentHookBanner, PersistentHookBannerProps } from './compositions/PersistentHookBanner';
 import { DocumentZoom, DocumentZoomProps } from './compositions/DocumentZoom';
 import { TerminalRunner, TerminalRunnerProps } from './compositions/TerminalRunner';
+import { StopwatchTicker, StopwatchTickerProps } from './compositions/StopwatchTicker';
+import { GrowthPill, GrowthPillProps } from './compositions/GrowthPill';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -68,6 +70,24 @@ export const RemotionRoot: React.FC = () => {
       <Composition<TerminalRunnerProps>
         id="TerminalRunner"
         component={TerminalRunner}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<StopwatchTickerProps>
+        id="StopwatchTicker"
+        component={StopwatchTicker}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<GrowthPillProps>
+        id="GrowthPill"
+        component={GrowthPill}
         durationInFrames={120}
         fps={30}
         width={1080}

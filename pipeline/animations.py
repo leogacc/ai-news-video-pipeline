@@ -37,6 +37,8 @@ SUPPORTED_COMPOSITIONS = {
     "PersistentHookBanner",
     "DocumentZoom",
     "TerminalRunner",
+    "StopwatchTicker",
+    "GrowthPill",
 }
 
 
@@ -335,6 +337,72 @@ def render_terminal_runner(
 
     return render_animation(
         composition="TerminalRunner",
+        props=props,
+        output_path=output_path,
+        duration_frames=duration_frames,
+    )
+
+
+def render_stopwatch_ticker(
+    target_seconds: float,
+    output_path: Union[str, Path],
+    label: str = "TIME UNTIL FULL DATABASE PURGE",
+    badge: str = "TEMPORAL VELOCITY",
+    title: str = "CATASTROPHIC ESCALATION SPEED",
+    subtitle: str = "Measured Time-To-Failure Across Agent Swarm",
+    source: str = "Source: Production Incident Telemetry",
+    warning_text: str = "CRITICAL AUTOMATION FAILURE ENCOUNTERED",
+    duration_frames: int = 120,
+) -> Path:
+    """Renders a StopwatchTicker composition showing animated millisecond elapsed counter and warning badge."""
+    props: Dict[str, Any] = {
+        "targetSeconds": target_seconds,
+        "label": label,
+        "badge": badge,
+        "title": title,
+        "subtitle": subtitle,
+        "source": source,
+        "warningText": warning_text,
+    }
+    return render_animation(
+        composition="StopwatchTicker",
+        props=props,
+        output_path=output_path,
+        duration_frames=duration_frames,
+    )
+
+
+def render_growth_pill(
+    value: str,
+    output_path: Union[str, Path],
+    label: str = "TOTAL MARKET CAP WIPEOUT",
+    sub_label: str = "Enterprise valuation loss across 14 enterprise providers",
+    trend: str = "down",
+    delta_badge: str = "-100%",
+    badge: str = "FINANCIAL SHOCKWAVE",
+    title: str = "MARKET VALUATION CRASH",
+    subtitle: str = "Immediate Capital Disruption Post-Deployment",
+    source: str = "Source: Bloomberg Terminal / Nasdaq Data",
+    stats: Optional[List[Dict[str, str]]] = None,
+    duration_frames: int = 120,
+) -> Path:
+    """Renders a GrowthPill composition showing shock valuations, deltas, and micro-stats."""
+    props: Dict[str, Any] = {
+        "value": value,
+        "label": label,
+        "subLabel": sub_label,
+        "trend": trend,
+        "deltaBadge": delta_badge,
+        "badge": badge,
+        "title": title,
+        "subtitle": subtitle,
+        "source": source,
+    }
+    if stats is not None:
+        props["stats"] = stats
+
+    return render_animation(
+        composition="GrowthPill",
         props=props,
         output_path=output_path,
         duration_frames=duration_frames,
