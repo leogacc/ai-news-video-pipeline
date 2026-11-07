@@ -640,9 +640,15 @@ class ClipAssembler:
             total_frames = int(math.ceil(duration * 30))
             step = 0.06 / max(1, total_frames)
 
+            # Alternating Ken Burns motion (even: push-in 1.0->1.06, odd: pull-out 1.06->1.0)
+            if shot_idx % 2 == 0:
+                zoom_expr = f"min(zoom+{step:.5f},1.06)"
+            else:
+                zoom_expr = f"max(1.06-on*{step:.5f},1.0)"
+
             vf = (
                 f"[0:v]scale={nw}:{nh}:flags=lanczos,"
-                f"zoompan=z='min(zoom+{step:.5f},1.06)':d={total_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={nw}x{nh}:fps=30,"
+                f"zoompan=z='{zoom_expr}':d={total_frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={nw}x{nh}:fps=30,"
                 f"pad=1080:1920:(1080-{nw})/2:{ct}:color=black[base];"
                 f"[base][1:v]overlay=0:0[outv]"
             )

@@ -500,6 +500,7 @@ flowchart TD
 * **Technical Specification:**
   1. Update `pipeline/assemble.py` and `scout/x_scout.py` to target **8 to 14 micro-cuts** per 30–45s clip (Average Shot Length: **2.5s – 3.5s**).
   2. Enforce the **Rule of 3.5 Seconds**: No visual scene may remain static for more than 4.0 seconds without a camera move, document zoom, or ticker event.
+* **Status:** **Complete (2026-11-06)** — Implemented dynamic 8-11 micro-cut storyboard sequencing in `scout/x_scout.py` and alternating Ken Burns motion in `pipeline/assemble.py`. Dark-mode terminal code evidence card generator codified in `clip_frames.py`. Unit tests passing 2/2 in `pipeline/test_pacing.py`.
 
 ### Objective 10.3: Persistent Visual Hook Banner Component
 * **Technical Specification:**
@@ -514,7 +515,7 @@ flowchart TD
 
 ### Phase 10 Exit Criteria
 - [x] `pipeline/write.py` produces 5-act dramatic scripts with quantified opening hooks.
-- [ ] Storyboard generator outputs 8–14 micro-shots with 2.5s–3.5s ASL.
+- [x] Storyboard generator outputs 8–14 micro-shots with 2.5s–3.5s ASL.
 - [x] Persistent high-contrast hook banner rendered across Shots 0 and 1.
 - [ ] Pattern interrupt injected at 75% mark without violating delivery specs.
 - [ ] Full automated QA gate pass and verified Telegram review queue delivery.

@@ -41,6 +41,7 @@ the middle-left placement from earlier the same day and the old
 top-left (60,80) 50% placement).
 """
 import os
+from pathlib import Path
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 
 TITLE_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -357,9 +358,59 @@ def build_persistent_hook_banner(
         for ln in (line1, line2):
             w = draw.textlength(ln, font=f2)
             tx = x0 + (width - w) // 2
-            draw.text((tx, ty), ln, font=f2, fill=(10, 14, 22, 255))
-            ty += lh
-
     return overlay
+
+
+def build_terminal_evidence_card(
+    out_path: str | Path,
+    title: str = "evals_verifier.py",
+    author: str = "AI Lab",
+    metrics: list[str] | None = None,
+) -> Path:
+    """Generate a crisp, dark-mode terminal code execution card (960x600) for concrete evidence shots."""
+    out_path = Path(out_path)
+    img = Image.new("RGB", (960, 600), color=(11, 15, 25))
+    draw = ImageDraw.Draw(img)
+
+    # Window border & controls
+    draw.rounded_rectangle([(10, 10), (950, 590)], radius=16, outline=(0, 242, 254), width=2)
+    draw.line([(10, 55), (950, 55)], fill=(0, 242, 254, 100), width=1)
+    for cx, c in [(35, (255, 95, 86)), (55, (255, 189, 46)), (75, (39, 201, 63))]:
+        draw.ellipse([cx - 5, 30 - 5, cx + 5, 30 + 5], fill=c)
+
+    font_path = TERMINAL_FONT if os.path.exists(TERMINAL_FONT) else "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+    try:
+        title_font = ImageFont.truetype(font_path, 16)
+        code_font = ImageFont.truetype(font_path, 20)
+    except Exception:
+        title_font = ImageFont.load_default()
+        code_font = ImageFont.load_default()
+
+    draw.text((105, 20), f"{title} — bash", font=title_font, fill=(160, 180, 205))
+
+    lines = metrics or [
+        f"$ ./verify_system.sh --target {author.lower().replace(' ', '_')}",
+        "[INIT] Loading open weights checkpoint into VRAM...",
+        "[EVAL] Reasoning trace verified against ground truth",
+        "[PASS] Capability benchmark verified: 93.2%",
+        "+ Status: 100% reproducible on local hardware",
+    ]
+
+    y = 85
+    for ln in lines:
+        if ln.startswith("+") or "PASS" in ln or "verified" in ln:
+            color = (57, 255, 20)
+        elif ln.startswith("$"):
+            color = (0, 242, 254)
+        elif "INIT" in ln or "EVAL" in ln:
+            color = (255, 189, 46)
+        else:
+            color = (220, 225, 235)
+        draw.text((40, y), ln, font=code_font, fill=color)
+        y += 42
+
+    img.save(str(out_path))
+    return out_path
+
 
 
