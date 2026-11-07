@@ -23,6 +23,15 @@ ROOT = Path(__file__).resolve().parent
 CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
 
 
+def _get_ca_bundle():
+    ca = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if ca and Path(ca).exists():
+        return ca
+    if Path("/etc/ssl/certs/ca-certificates.crt").exists():
+        return "/etc/ssl/certs/ca-certificates.crt"
+    return True
+
+
 def telegram_send(video: Path, caption: str):
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat = os.environ["TELEGRAM_CHAT_ID"]
@@ -32,6 +41,7 @@ def telegram_send(video: Path, caption: str):
             data={"chat_id": chat, "caption": caption[:1024],
                   "parse_mode": "HTML"},
             files={"video": (video.name, f, "video/mp4")},
+            verify=_get_ca_bundle(),
             timeout=300)
     r.raise_for_status()
     print("[publish] sent to Telegram review queue")
@@ -55,6 +65,7 @@ def telegram_send_description(script: dict):
     r = requests.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
         data={"chat_id": chat, "text": text[:4096]},
+        verify=_get_ca_bundle(),
         timeout=60)
     r.raise_for_status()
     print("[publish] TikTok description sent to Telegram")

@@ -1,0 +1,771 @@
+{
+  "timestamp": "2026-11-06T04:54:46.195668+00:00",
+  "syndication_timeline": {
+    "success_rate": "14/14 (100.0%)",
+    "avg_latency_s": 0.401,
+    "accounts": {
+      "kimmonismus": {
+        "status": 200,
+        "latency_s": 0.457,
+        "tweet_count": 99,
+        "latest_tweet": {
+          "id": "2110724880085696735",
+          "created_at": "Thu Oct 15 13:30:01 +0000 2026",
+          "text": "Now I can finally share it: I\u2019ve spent the past week traveling across Europe with NVIDIA, covering all their Build a Cla",
+          "likes": 2469,
+          "retweets": 53,
+          "has_media": true
+        },
+        "verified": true,
+        "user_name": "Chubby\u2668\ufe0f",
+        "error": null
+      },
+      "sama": {
+        "status": 200,
+        "latency_s": 0.348,
+        "tweet_count": 100,
+        "latest_tweet": {
+          "id": "1889059531625464090",
+          "created_at": "Mon Feb 10 21:11:04 +0000 2025",
+          "text": "no thank you but we will buy twitter for $9.74 billion if you want",
+          "likes": 216912,
+          "retweets": 16797,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Sam Altman",
+        "error": null
+      },
+      "gdb": {
+        "status": 200,
+        "latency_s": 0.384,
+        "tweet_count": 100,
+        "latest_tweet": {
+          "id": "1725736242137182594",
+          "created_at": "Sat Nov 18 04:42:37 +0000 2023",
+          "text": "Sam and I are shocked and saddened by what the board did today.\n\nLet us first say thank you to all the incredible people",
+          "likes": 53857,
+          "retweets": 6780,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Greg Brockman",
+        "error": null
+      },
+      "DarioAmodei": {
+        "status": 200,
+        "latency_s": 0.147,
+        "tweet_count": 4,
+        "latest_tweet": {
+          "id": "1977010693460443151",
+          "created_at": "Sat Oct 11 13:57:35 +0000 2025",
+          "text": "Today I met with PM @narendramodi to discuss Anthropic's expansion to India\u2014where Claude Code use is up 5\u00d7 since June. H",
+          "likes": 9725,
+          "retweets": 807,
+          "has_media": true
+        },
+        "verified": true,
+        "user_name": "Dario Amodei",
+        "error": null
+      },
+      "demishassabis": {
+        "status": 200,
+        "latency_s": 0.545,
+        "tweet_count": 101,
+        "latest_tweet": {
+          "id": "2115933173175689570",
+          "created_at": "Thu Oct 29 22:25:55 +0000 2026",
+          "text": "No.1 \ud83d\udc8e https://t.co/k4Werb6ZGV",
+          "likes": 10469,
+          "retweets": 456,
+          "has_media": true
+        },
+        "verified": true,
+        "user_name": "Demis Hassabis",
+        "error": null
+      },
+      "JeffDean": {
+        "status": 200,
+        "latency_s": 0.512,
+        "tweet_count": 100,
+        "latest_tweet": {
+          "id": "1069606809126793217",
+          "created_at": "Mon Dec 03 14:58:30 +0000 2018",
+          "text": "In April, '17, @jsomers of @NewYorker reached out &amp; said he wanted to do a small profile of me &amp; my longtime col",
+          "likes": 5929,
+          "retweets": 1204,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Jeff Dean",
+        "error": null
+      },
+      "ylecun": {
+        "status": 200,
+        "latency_s": 0.512,
+        "tweet_count": 101,
+        "latest_tweet": {
+          "id": "1862598063275061484",
+          "created_at": "Fri Nov 29 20:42:38 +0000 2024",
+          "text": "I do not write posts on X.\nI tweet links to posts on other platforms.\nI like and retweet (occasionally)\nI comment on fri",
+          "likes": 2213,
+          "retweets": 123,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Yann LeCun",
+        "error": null
+      },
+      "elonmusk": {
+        "status": 200,
+        "latency_s": 0.363,
+        "tweet_count": 99,
+        "latest_tweet": {
+          "id": "1519480761749016577",
+          "created_at": "Thu Apr 28 00:56:58 +0000 2022",
+          "text": "Next I\u2019m buying Coca-Cola to put the cocaine back in",
+          "likes": 4173492,
+          "retweets": 574003,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Elon Musk",
+        "error": null
+      },
+      "mustafasuleyman": {
+        "status": 200,
+        "latency_s": 0.423,
+        "tweet_count": 101,
+        "latest_tweet": {
+          "id": "2110766651344146564",
+          "created_at": "Thu Oct 15 16:16:00 +0000 2026",
+          "text": "We now have state-of-the-art pre-trained base models in the 3T-parameter weight class, built entirely in-house at MAI.\n\n",
+          "likes": 3508,
+          "retweets": 358,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Mustafa Suleyman",
+        "error": null
+      },
+      "satyanadella": {
+        "status": 200,
+        "latency_s": 0.463,
+        "tweet_count": 101,
+        "latest_tweet": {
+          "id": "2115577764300693644",
+          "created_at": "Wed Oct 28 22:53:39 +0000 2026",
+          "text": "Just wrapped our earnings call. It was a fast start to our fiscal year.\n\nMicrosoft Cloud revenue surpassed $63B, with gr",
+          "likes": 9300,
+          "retweets": 581,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Satya Nadella",
+        "error": null
+      },
+      "ArthurMensh": {
+        "status": 200,
+        "latency_s": 0.103,
+        "tweet_count": 0,
+        "latest_tweet": null,
+        "verified": false,
+        "user_name": null,
+        "error": null
+      },
+      "aidangomez": {
+        "status": 200,
+        "latency_s": 0.457,
+        "tweet_count": 100,
+        "latest_tweet": {
+          "id": "1884471779311378470",
+          "created_at": "Wed Jan 29 05:20:58 +0000 2025",
+          "text": "wtf https://t.co/WdrptnxDjh",
+          "likes": 2741,
+          "retweets": 39,
+          "has_media": true
+        },
+        "verified": true,
+        "user_name": "Aidan Gomez",
+        "error": null
+      },
+      "AravSrinivas": {
+        "status": 200,
+        "latency_s": 0.39,
+        "tweet_count": 85,
+        "latest_tweet": {
+          "id": "2118388400730591469",
+          "created_at": "Thu Nov 05 17:02:07 +0000 2026",
+          "text": "Today, we're launching Perplexity Teammates. \nThey are personal agents for work. And change the paradigm from writing pr",
+          "likes": 992,
+          "retweets": 78,
+          "has_media": true
+        },
+        "verified": true,
+        "user_name": "Aravind Srinivas",
+        "error": null
+      },
+      "miramurati": {
+        "status": 200,
+        "latency_s": 0.504,
+        "tweet_count": 100,
+        "latest_tweet": {
+          "id": "1726542556203483392",
+          "created_at": "Mon Nov 20 10:06:37 +0000 2023",
+          "text": "OpenAI is nothing without its people",
+          "likes": 30590,
+          "retweets": 1940,
+          "has_media": false
+        },
+        "verified": true,
+        "user_name": "Mira Murati",
+        "error": null
+      }
+    }
+  },
+  "fxtwitter_profile": {
+    "success_rate": "0/5 (0.0%)",
+    "avg_latency_s": 0.547,
+    "accounts": {
+      "kimmonismus": {
+        "status": 404,
+        "latency_s": 0.858,
+        "error": "HTTP 404"
+      },
+      "sama": {
+        "status": 200,
+        "latency_s": 0.383,
+        "error": "object of type 'int' has no len()",
+        "user_name": "Sam Altman"
+      },
+      "gdb": {
+        "status": 200,
+        "latency_s": 0.583,
+        "error": "object of type 'int' has no len()",
+        "user_name": "Greg Brockman"
+      },
+      "DarioAmodei": {
+        "status": 200,
+        "latency_s": 0.165,
+        "error": "object of type 'int' has no len()",
+        "user_name": "Dario Amodei"
+      },
+      "demishassabis": {
+        "status": 404,
+        "latency_s": 0.749,
+        "error": "HTTP 404"
+      }
+    }
+  },
+  "nitter_viability": {
+    "https://nitter.net": {
+      "status": 410,
+      "latency_s": 4.029,
+      "alive": false,
+      "error": "HTTP 410 or invalid RSS"
+    },
+    "https://nitter.poast.org": {
+      "status": 502,
+      "latency_s": 0.033,
+      "alive": false,
+      "error": "HTTP 502 or invalid RSS"
+    },
+    "https://nitter.privacydev.net": {
+      "status": 502,
+      "latency_s": 0.068,
+      "alive": false,
+      "error": "HTTP 502 or invalid RSS"
+    },
+    "https://nitter.cz": {
+      "status": 503,
+      "latency_s": 1.144,
+      "alive": false,
+      "error": "HTTP 503 or invalid RSS"
+    },
+    "https://lightbrd.com": {
+      "status": 403,
+      "latency_s": 0.234,
+      "alive": false,
+      "error": "HTTP 403 or invalid RSS"
+    }
+  },
+  "google_news_rss": {
+    "total_queries": 7,
+    "total_results": 700,
+    "avg_latency_s": 0.38,
+    "queries": {
+      "OpenAI": {
+        "status": 200,
+        "latency_s": 0.402,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "Introducing GPT\u20116 Cyber: a major advance in security research that pairs stronger capabilities with ",
+            "link": "https://news.google.com/rss/articles/CBMiW0FVX3lxTFAtdl9rcWpZcDREVlB4VFhlUTBtQ3JvVnduQndtS",
+            "pub_date": "Thu, 05 Nov 2026 17:09:13 GMT",
+            "source": "X"
+          },
+          {
+            "title": "The communities that host AI infrastructure should have a say in how it\u2019s built and share in the ben",
+            "link": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE5CeVhHbGdQVFJLLUtNa0U1dTdOZlpnT1JfaUNwb",
+            "pub_date": "Thu, 05 Nov 2026 20:09:03 GMT",
+            "source": "X"
+          },
+          {
+            "title": "In this narrow defender\u2019s window, our goal is to expand Daybreak access to organizations of every si",
+            "link": "https://news.google.com/rss/articles/CBMiW0FVX3lxTE9RNFdKbzhfYWJ1QVpOMnFPdjFrNFRTT29wN29Fe",
+            "pub_date": "Thu, 05 Nov 2026 17:09:14 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      },
+      "Anthropic Claude": {
+        "status": 200,
+        "latency_s": 0.394,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "We\u2019re sharing how our biology research team worked with Claude to map the first 3D structure of a va",
+            "link": "https://news.google.com/rss/articles/CBMiYkFVX3lxTE5sSm5IR3Y3enJ6Y2JtbElXZUNZX0FJMnFqZlZGR",
+            "pub_date": "Wed, 04 Nov 2026 20:11:28 GMT",
+            "source": "X"
+          },
+          {
+            "title": "Background subagents in Claude Code now use less of your usage limit. A running subagent updates its",
+            "link": "https://news.google.com/rss/articles/CBMiYEFVX3lxTFB0TFcwMUpFWUVBSFFuSDF5VUxrWGdSLTN4aFk1U",
+            "pub_date": "Wed, 04 Nov 2026 19:29:39 GMT",
+            "source": "X"
+          },
+          {
+            "title": "Friday was my last day at Anthropic. Two years ago, when Claude Code was a small internal tool, I as",
+            "link": "https://news.google.com/rss/articles/CBMiW0FVX3lxTE1nRUdlbjdSODBoT05xV0ViSmYzSTRhSHFDRnVRW",
+            "pub_date": "Tue, 03 Nov 2026 21:33:33 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      },
+      "DeepSeek": {
+        "status": 200,
+        "latency_s": 0.403,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "18 of the 20 best open models today are Mixture-of-Experts. Dense is basically over. And yet the kno",
+            "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE1wNEwxeTJZeXpDeXlELXN1cmxVYnpZa2diaXQ1d",
+            "pub_date": "Thu, 05 Nov 2026 19:57:15 GMT",
+            "source": "X"
+          },
+          {
+            "title": "A $100 budget buys 40 Intelligence Index tasks (a mix of task archetypes) with Opus 5.5 at medium re",
+            "link": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE9CX2N0NmpldElDb0w4ZHdTWE5oanVvaTR6czZlb",
+            "pub_date": "Wed, 04 Nov 2026 22:02:34 GMT",
+            "source": "X"
+          },
+          {
+            "title": "the team is experimenting this week at switching all our subagents to deepseek flash and using opus ",
+            "link": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE1iVUM3Q0c0bDdKVmZ2MHM3cG9VbDZ6OFdOdDM5S",
+            "pub_date": "Wed, 04 Nov 2026 19:16:48 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      },
+      "Mistral": {
+        "status": 200,
+        "latency_s": 0.345,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "\ud83c\udd95 Le Chonk brings the brains. Mistral Studio gets it working. Introducing managed agents and apps, p",
+            "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE9KVmMzalhPeWVaVnVBM090VVNDem12REg1RWw5R",
+            "pub_date": "Thu, 05 Nov 2026 15:49:54 GMT",
+            "source": "X"
+          },
+          {
+            "title": "Can Mistral Large 4 find a critical vulnerability, prove it and fix it? We tested it on a recent Dja",
+            "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFAtcjdvRzVrRlFXeVF4OXRwREN1c0JfSVZnYTczW",
+            "pub_date": "Wed, 04 Nov 2026 10:24:20 GMT",
+            "source": "X"
+          },
+          {
+            "title": "Mistral Large 4 joins the model lineup on Open Math OS. 1.05T open weights, 1M context, live today f",
+            "link": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE5KbUF5amRXVXFGN2tGcnRqcDFTc2VjNExXakJ2O",
+            "pub_date": "Tue, 03 Nov 2026 17:30:00 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      },
+      "Qwen": {
+        "status": 200,
+        "latency_s": 0.347,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "This the most interesting part of the release to me. Inkling-Small was pretty difficult to post-trai",
+            "link": "https://news.google.com/rss/articles/CBMiYEFVX3lxTFBscUZPZkJwQlRMWWE2YlljSHdtSXpqRFdQWGFVR",
+            "pub_date": "Thu, 05 Nov 2026 23:51:26 GMT",
+            "source": "X"
+          },
+          {
+            "title": "We asked GPT-6 Astra to edit Qwen3.5-0.8B weights to improve math. It directly changed only 0.016% o",
+            "link": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE9GczB4bjRKUEpEN2N1azlKQVBWQ1lmbnpMeU1Qb",
+            "pub_date": "Mon, 02 Nov 2026 17:51:48 GMT",
+            "source": "X"
+          },
+          {
+            "title": "DeepSeek Harness DAU increased to 1.54m as of yesterday. Huge jump after 1017 got released. Likely d",
+            "link": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE1FYUtJZVVBR2hYblZaOUpRcDFNQ2tWY3A4UlROV",
+            "pub_date": "Thu, 05 Nov 2026 17:04:21 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      },
+      "AI reasoning model": {
+        "status": 200,
+        "latency_s": 0.426,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "\ud83e\udd77 New stealth model: Crouton Alpha A highly efficient reasoning model built to scale out the work yo",
+            "link": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE5mOVpxQ3g1NHJwdlBPNkptNXNidnY3cWp2cC1sY",
+            "pub_date": "Tue, 03 Nov 2026 20:17:08 GMT",
+            "source": "X"
+          },
+          {
+            "title": "Google DeepMind discovered a terrifying blind spot in every major AI model. They found that attachin",
+            "link": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE1OLWhlS2FlRnBWWHkybGRPa3N1RnlCdVBJUG9za",
+            "pub_date": "Wed, 04 Nov 2026 07:44:05 GMT",
+            "source": "X"
+          },
+          {
+            "title": "MIT AI Reads and Edits Neural Network Weights Directly - X",
+            "link": "https://news.google.com/rss/articles/CBMiV0FVX3lxTE5xZ2dYM0psSDh6Zmk4TW1kb2JNenpmT2tjUEY4S",
+            "pub_date": "Wed, 04 Nov 2026 08:00:00 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      },
+      "new model release": {
+        "status": 200,
+        "latency_s": 0.344,
+        "items_count": 100,
+        "items": [
+          {
+            "title": "Meituan released LongCat-2.5, its new multimodal model with 1.6T total parameters and 49B active. Lo",
+            "link": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE5wRlEtMHY4aklSMWlUYjdIdkpqN0hnNWdtdTF0b",
+            "pub_date": "Mon, 02 Nov 2026 16:00:33 GMT",
+            "source": "X"
+          },
+          {
+            "title": "It\u2019s happening! New OpenAI models spotted! Looks like GPT-6.2 incoming - X",
+            "link": "https://news.google.com/rss/articles/CBMiYkFVX3lxTE9UWmx4MmUybFdOYzE5Zm5oZUNlSGFET3RSaEVxa",
+            "pub_date": "Tue, 03 Nov 2026 18:59:29 GMT",
+            "source": "X"
+          },
+          {
+            "title": "Ok, *this is impressive*: Ricursive Intelligence just released Ripple-65B Preview, an open-weight AI",
+            "link": "https://news.google.com/rss/articles/CBMiYkFVX3lxTE9CSzNUaTJWQXQ5M3A2R0JCWU9LLTAwTmZ1U1U3Q",
+            "pub_date": "Wed, 04 Nov 2026 19:42:58 GMT",
+            "source": "X"
+          }
+        ],
+        "error": null
+      }
+    }
+  },
+  "hn_algolia": {
+    "total_queries": 7,
+    "total_hits": 70,
+    "avg_latency_s": 0.297,
+    "queries": {
+      "OpenAI": {
+        "status": 200,
+        "latency_s": 0.251,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "Open AI Cellular: Open platform for prototyping and testing AI based 6G",
+            "points": 4,
+            "comments": 0,
+            "url": "https://www.openaicellular.org",
+            "is_x_link": false
+          },
+          {
+            "title": "Prisment \u2013 Local-first doc workspace (Markdown, OpenAPI, Mermaid)",
+            "points": 1,
+            "comments": 1,
+            "url": "https://prisment.io/",
+            "is_x_link": false
+          },
+          {
+            "title": "Show HN: LLMBrake \u2013 Per-customer dollar caps for OpenAI/Anthropic API calls",
+            "points": 2,
+            "comments": 0,
+            "url": "https://github.com/llmbrake/llmbrake",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 1,
+        "error": null
+      },
+      "Anthropic Claude": {
+        "status": 200,
+        "latency_s": 0.313,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "Claude Code sends your email address to websites",
+            "points": 744,
+            "comments": 253,
+            "url": "https://github.com/anthropics/claude-code/issues/107757",
+            "is_x_link": false
+          },
+          {
+            "title": "Claude's new Personal Finance tool aims to help analyze your spending",
+            "points": 2,
+            "comments": 0,
+            "url": "https://www.zdnet.com/innovation/personal-finance-claude-anthropic/",
+            "is_x_link": false
+          },
+          {
+            "title": "Show HN: Training a SOTA Pangram-like detector on a 4070ti with Claude",
+            "points": 1,
+            "comments": 0,
+            "url": "https://huggingface.co/mesmertech/mesmer-ai-detector-4b",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 0,
+        "error": null
+      },
+      "DeepSeek": {
+        "status": 200,
+        "latency_s": 0.369,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "Show HN: Umbel \u2013 Remote-control agent CLIs over tmux",
+            "points": 1,
+            "comments": 0,
+            "url": "https://github.com/jahala/umbel",
+            "is_x_link": false
+          },
+          {
+            "title": "DeepSeek Harness [video]",
+            "points": 2,
+            "comments": 0,
+            "url": "https://www.youtube.com/watch?v=VKmUC5ukfqU",
+            "is_x_link": false
+          },
+          {
+            "title": "DeepSeek alone now accounts for 53% of all token volume on Openrouter",
+            "points": 2,
+            "comments": 3,
+            "url": "https://dirac.run/labs-market-share",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 0,
+        "error": null
+      },
+      "Mistral": {
+        "status": 200,
+        "latency_s": 0.278,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "How Australia played the first music on a computer",
+            "points": 1,
+            "comments": 0,
+            "url": "https://www.pearcey.org.au/heritage/csirac/how-australia-played-the-worlds-first",
+            "is_x_link": false
+          },
+          {
+            "title": "Show HN: Stenvakt, a server hardening and patching tool",
+            "points": 1,
+            "comments": 0,
+            "url": "https://stenvakt.com/",
+            "is_x_link": false
+          },
+          {
+            "title": "Australia approves seabed site where a Japanese company will store CO2 pollution",
+            "points": 4,
+            "comments": 2,
+            "url": "https://phys.org/news/2026-11-australia-seabed-site-japanese-company.html",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 0,
+        "error": null
+      },
+      "Qwen": {
+        "status": 200,
+        "latency_s": 0.284,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "Teaching Qwen Why",
+            "points": 1,
+            "comments": 0,
+            "url": "https://www.lesswrong.com/posts/35yw2qGK7naFLAvcq/teaching-qwen-why-1",
+            "is_x_link": false
+          },
+          {
+            "title": "Show HN: HackerRepos \u2013 HackerTube for repos mentioned on HN",
+            "points": 2,
+            "comments": 2,
+            "url": "https://HackerRepos.fyi/",
+            "is_x_link": false
+          },
+          {
+            "title": "VibeSys on Trainium: Agents Build/Tune Qwen3.8 Serving Engines on AWS Trainium2",
+            "points": 1,
+            "comments": 0,
+            "url": "https://syfi.cs.washington.edu/blog/2026-11-04-vibesys-trainium/",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 0,
+        "error": null
+      },
+      "AI reasoning model": {
+        "status": 200,
+        "latency_s": 0.284,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "Show HN: Project Wisteria-A BYOK chatbot that saves thoughts and memory locally",
+            "points": 1,
+            "comments": 1,
+            "url": "https://negativeabsence.com/wisteria/",
+            "is_x_link": false
+          },
+          {
+            "title": "Show HN: Fabivo \u2013 Furniture design from a photo to a numbered cut list",
+            "points": 6,
+            "comments": 0,
+            "url": "https://www.fabivo.app/en",
+            "is_x_link": false
+          },
+          {
+            "title": "Why it is foolish to think AI can't write like humans",
+            "points": 2,
+            "comments": 3,
+            "url": "",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 0,
+        "error": null
+      },
+      "new model release": {
+        "status": 200,
+        "latency_s": 0.3,
+        "hits_count": 10,
+        "top_hits": [
+          {
+            "title": "Show HN: A terminal viewer for plain text data files (JSON,YAML,CSV,XML,)",
+            "points": 1,
+            "comments": 0,
+            "url": "https://aless.tabnas.dev/",
+            "is_x_link": false
+          },
+          {
+            "title": "Show HN: Gauge \u2013 Open-Source CLI to recursively improve your docs",
+            "points": 40,
+            "comments": 10,
+            "url": "https://github.com/gauge-sh/gauge-cli",
+            "is_x_link": false
+          },
+          {
+            "title": "Launch HN: Kino AI (YC S23) \u2013 AI media manager and video editor",
+            "points": 103,
+            "comments": 35,
+            "url": "",
+            "is_x_link": false
+          }
+        ],
+        "x_links_count": 0,
+        "error": null
+      }
+    }
+  },
+  "media_fidelity": {
+    "1889059531625464090": {
+      "label": "Text-only / Quote",
+      "handle": "sama",
+      "syndication": {
+        "status": 200,
+        "latency_s": 0.1,
+        "media_count": 0,
+        "types": [],
+        "photo_urls": [],
+        "videos": []
+      },
+      "fxtwitter": {
+        "status": 200,
+        "latency_s": 0.182,
+        "photos_count": 0,
+        "videos_count": 0
+      }
+    },
+    "2114780711664398349": {
+      "label": "Multi-Image Announcement",
+      "handle": "OpenAI",
+      "syndication": {
+        "status": 200,
+        "latency_s": 0.144,
+        "media_count": 1,
+        "types": [
+          "video"
+        ],
+        "photo_urls": [],
+        "videos": [
+          {
+            "duration_ms": 31458,
+            "variants_count": 5,
+            "best_mp4": "https://video.twimg.com/amplify_video/2114778494395678720/vid/avc1/1920x1080/oUzhkuK2tc42w-OZ.mp4",
+            "best_bitrate": 10368000
+          }
+        ]
+      },
+      "fxtwitter": {
+        "status": 200,
+        "latency_s": 0.14,
+        "photos_count": 0,
+        "videos_count": 1,
+        "best_video_url": "https://video.twimg.com/amplify_video/2114778494395678720/vid/avc1/1920x1080/oUzhkuK2tc42w-OZ.mp4?tag=29",
+        "thumbnail_url": "https://pbs.twimg.com/media/HVk3m2pW0AERTJj.jpg"
+      }
+    },
+    "1894814890664964522": {
+      "label": "AI Video Demo",
+      "handle": "kimmonismus",
+      "syndication": {
+        "status": 404,
+        "latency_s": 0.101,
+        "error": "HTTP 404"
+      },
+      "fxtwitter": {
+        "status": 404,
+        "latency_s": 0.735,
+        "error": "HTTP 404"
+      }
+    }
+  },
+  "burst_resilience": {
+    "total_requests": 30,
+    "total_duration_s": 3.381,
+    "requests_per_sec": 8.87,
+    "avg_latency_s": 0.113,
+    "p95_latency_s": 0.133,
+    "status_distribution": {
+      "200": 30
+    }
+  }
+}

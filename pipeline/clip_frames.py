@@ -40,9 +40,11 @@ frame. It may overlap the mid content (user, 2026-11-05 — supersedes
 the middle-left placement from earlier the same day and the old
 top-left (60,80) 50% placement).
 """
+import os
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 
 TITLE_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+TERMINAL_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 # 2026-11-04 SOURCE-REGULAR RULE (user: "Have the Find source text not
 # be bold"): the bio block's Source line renders in REGULAR weight.
 # 2026-11-05 the bio is a single Source line (the finding line was
@@ -147,3 +149,131 @@ def build_frame(src, title_lines, bio_lines):
     return canvas, {"nw": nw, "nh": nh, "content_top": content_top,
                     "content_bottom": content_top + nh,
                     "title": (t0, t1), "bio": (b0, b1)}
+
+
+def draw_overlay_box(canvas, y0, y1, lines, size, fonts=None):
+    """Draw a feathered semi-transparent text block directly onto an RGBA overlay."""
+    box_w = BOX_W
+    box_h = y1 - y0
+    box_img = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 0))
+    mask = Image.new("L", (box_w, box_h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, box_w - 1, box_h - 1], radius=18, fill=230)
+    mask = mask.filter(ImageFilter.GaussianBlur(12))
+
+    fill_layer = Image.new("RGBA", (box_w, box_h), (0, 0, 0, 190))
+    box_img.paste(fill_layer, (0, 0), mask)
+    canvas.alpha_composite(box_img, (BOX_X, y0))
+
+    draw = ImageDraw.Draw(canvas)
+    lh = size + 14
+    total_h = lh * len(lines)
+    ty = y0 + (y1 - y0 - total_h) // 2
+    for i, ln in enumerate(lines):
+        f = ImageFont.truetype(fonts[i] if fonts else TITLE_FONT, size)
+        w = draw.textlength(ln, font=f)
+        draw.text(((1080 - w) // 2, ty), ln, font=f, fill=(255, 255, 255, 255))
+        ty += lh
+
+
+def build_video_overlay(title_lines, bio_lines, video_w, video_h, max_w=960):
+    """Generate a transparent 1080x1920 RGBA overlay for a moving video shot.
+
+    Returns:
+        (overlay_image, layout_dict)
+        where layout_dict has: nw, nh, content_top, content_bottom, title, bio
+    """
+    nw, nh, content_top, t0, t1, b0, b1 = hug_layout(
+        len(title_lines), len(bio_lines), video_w, video_h, max_w=max_w
+    )
+    overlay = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+    draw_overlay_box(overlay, t0, t1, title_lines, 46)
+
+    bio_fonts = [BIO_FONT if ln.startswith("Source:") else TITLE_FONT for ln in bio_lines]
+    draw_overlay_box(overlay, b0, b1, bio_lines, 34, fonts=bio_fonts)
+
+    # Watermark beneath bio (user, 2026-11-05): x=60, bio bottom + 20px, alpha 51
+    wmf = ImageFont.truetype(TITLE_FONT, 34)
+    _wmd = ImageDraw.Draw(overlay)
+    _bb = _wmd.textbbox((0, 0), "@leos.logos", font=wmf)
+    _wm_h = _bb[3] - _bb[1]
+    _wm_y = min(b1 + 20, 1495 - _wm_h) - _bb[1]
+    _wmd.text((60, _wm_y), "@leos.logos", font=wmf, fill=(255, 255, 255, 51))
+
+    layout = {
+        "nw": nw,
+        "nh": nh,
+        "content_top": content_top,
+        "content_bottom": content_top + nh,
+        "title": (t0, t1),
+        "bio": (b0, b1),
+    }
+    return overlay, layout
+
+
+def build_terminal_window_overlay(
+    box_top: int = 1150,
+    box_height: int = 275,
+    width: int = 960,
+) -> Image.Image:
+    """Generate a transparent 1080x1920 RGBA overlay featuring a frosted dark terminal console window.
+
+    - Centered horizontally: x0 = (1080 - width) // 2 (= 60 for width=960), x1 = x0 + width (= 1020)
+    - Vertical span: y0 = box_top (= 1150), y1 = box_top + box_height (= 1425)
+    - Frosted dark console background: rgba(11, 15, 25, 0.92) -> (11, 15, 25, 235)
+    - Border: 1px solid rgba(0, 242, 254, 0.28) with rounded corners (radius 18)
+    - Title bar / window controls: Red dot (#FF5F56), Yellow dot (#FFBD2E), Green dot (#27C93F)
+      with 12px diameter located at y ≈ y0 + 19 (centers x0 + 24, x0 + 44, x0 + 64)
+    - Monospace title: 'bash — ai-news@terminal' centered horizontally in title bar (y ≈ y0 + 10)
+    """
+    overlay = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    x0 = (1080 - width) // 2
+    x1 = x0 + width
+    y0 = box_top
+    y1 = box_top + box_height
+
+    # Draw rounded dark console window
+    draw.rounded_rectangle(
+        [x0, y0, x1 - 1, y1 - 1],
+        radius=18,
+        fill=(11, 15, 25, 235),
+        outline=(0, 242, 254, 70),
+        width=1,
+    )
+
+    # Title bar divider line at y0 + 38
+    draw.line(
+        [(x0 + 1, y0 + 38), (x1 - 2, y0 + 38)],
+        fill=(0, 242, 254, 40),
+        width=1,
+    )
+
+    # Traffic light control dots: 12px diameter (r = 6)
+    cy = y0 + 19
+    r = 6
+    controls = [
+        (x0 + 24, (255, 95, 86, 255)),   # Red #FF5F56
+        (x0 + 44, (255, 189, 46, 255)),  # Yellow #FFBD2E
+        (x0 + 64, (39, 201, 63, 255)),   # Green #27C93F
+    ]
+    for cx, color in controls:
+        draw.ellipse([cx - r, cy - r, cx + r - 1, cy + r - 1], fill=color)
+
+    # Monospace title centered horizontally in title bar
+    title_text = "bash — ai-news@terminal"
+    font_path = TERMINAL_FONT
+    if not os.path.exists(font_path):
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+    try:
+        font = ImageFont.truetype(font_path, 15)
+    except Exception:
+        font = ImageFont.load_default()
+
+    tw = draw.textlength(title_text, font=font)
+    tx = x0 + (width - tw) // 2
+    ty = y0 + 10
+    draw.text((tx, ty), title_text, font=font, fill=(180, 195, 215, 210))
+
+    return overlay
+

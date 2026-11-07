@@ -2,6 +2,9 @@
 .env
 token.pickle
 client_secrets.json
+credentials/
+*service_account*.json
+*taskwise*.json
 
 # Python
 .venv/
@@ -16,8 +19,13 @@ pipeline/backups/
 .kokoro_cache/
 .logs/
 
-# Node
+# Node & Remotion Cache
 pipeline/tweetshot/node_modules/
+pipeline/animations/node_modules/
+pipeline/animations/.remotion_bundle_cache/
+.remotion/
+.gcp_tts_quota.json
+pipeline/.gcp_tts_quota.json
 
 # Scout per-run logs (state files stay: saved_items.json, state.json, clipped_finds.json)
 scout/runs/

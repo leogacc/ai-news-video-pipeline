@@ -32,14 +32,13 @@ from pathlib import Path
 # IPv6 entries) — any cache-miss TTS run dies at the first segment.
 # (Surfaced when the "Breaking!" delivery change forced a re-synth.)
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
-# Same root cause, second half: even in offline mode kokoro's model
-# loader constructs the hub HTTP client, and this httpx version dies
-# parsing the bracketed-IPv6 no_proxy entries before any request is
-# made. TTS is fully offline (model cached above), so drop proxy vars
-# outright instead of crashing inside URL parsing.
-for _k in ("http_proxy", "https_proxy", "all_proxy", "no_proxy",
-           "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"):
-    os.environ.pop(_k, None)
+# Sanitize no_proxy by removing bracketed IPv6 entries (e.g. [::1]) which crash httpx URL parsing,
+# while preserving HTTP_PROXY and HTTPS_PROXY so downstream publishers (Telegram API) remain routed.
+for _k in ("no_proxy", "NO_PROXY"):
+    if _k in os.environ:
+        os.environ[_k] = ",".join(
+            p for p in os.environ[_k].split(",") if not (p.strip().startswith("[") and p.strip().endswith("]"))
+        )
 
 import numpy as np
 import soundfile as sf
@@ -272,11 +271,14 @@ def _synth_chunks(pipeline, input_text: str, sr: int):
         tight, remap = tighten_with_remap(raw, sr)
         toks = []
         for tk in (res.tokens or []):
-            if not getattr(tk, "phonemes", None) \
-                    or not hasattr(tk, "start_ts"):
+            if not getattr(tk, "phonemes", None):
                 continue
-            toks.append((tk.text, remap(float(tk.start_ts)),
-                         remap(float(tk.end_ts)), bool(tk.whitespace)))
+            start_ts = getattr(tk, "start_ts", None)
+            end_ts = getattr(tk, "end_ts", None)
+            if start_ts is None or end_ts is None:
+                continue
+            toks.append((tk.text, remap(float(start_ts)),
+                         remap(float(end_ts)), bool(getattr(tk, "whitespace", False))))
         for w, s, e in tokens_to_words(toks):
             tts_words.append((w, round(t + s, 3), round(t + e, 3)))
         wav_parts.append(tight)

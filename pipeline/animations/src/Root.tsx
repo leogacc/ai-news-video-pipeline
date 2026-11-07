@@ -1,0 +1,49 @@
+import React from 'react';
+import { Composition } from 'remotion';
+import { BenchmarkLadder, BenchmarkLadderProps } from './compositions/BenchmarkLadder';
+import { ArchitectureDiagram, ArchitectureDiagramProps } from './compositions/ArchitectureDiagram';
+import { KineticMetricCounter, KineticMetricCounterProps } from './compositions/KineticMetricCounter';
+import { TweetCard3D, TweetCard3DProps } from './compositions/TweetCard3D';
+
+export const RemotionRoot: React.FC = () => {
+  return (
+    <>
+      <Composition<BenchmarkLadderProps>
+        id="BenchmarkLadder"
+        component={BenchmarkLadder}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<ArchitectureDiagramProps>
+        id="ArchitectureDiagram"
+        component={ArchitectureDiagram}
+        durationInFrames={150}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<KineticMetricCounterProps>
+        id="KineticMetricCounter"
+        component={KineticMetricCounter}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<TweetCard3DProps>
+        id="TweetCard3D"
+        component={TweetCard3D}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+    </>
+  );
+};

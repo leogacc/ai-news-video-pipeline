@@ -210,11 +210,25 @@ footage_priority_2026_10_27:
     hard_cuts_watermark_qa: "Hard cuts only; @leos.logos watermark every frame; no black frames; no file that fails ffprobe — the same QA bar as the montage."
   how_to_get_source_footage:
     - "Pull the source's own video first: the announcement / demo video linked from the root source (official blog, repo README, product page, company channel)."
-    - "MANDATORY THREADS HUNT (v2026.10.28.1): for a Threads-sourced pick, BEFORE falling back to stills, run pipeline/threads_media.py on the surfacing post — the connector returns text only and NEVER supplies the post's media, so a hunt that stops at the connector has not hunted at all. The script extracts the post's own image files directly (curl of the /media viewer page; do not 'improve' its bare Mozilla/5.0 UA — a full Chrome UA gets a reduced page with no media URLs). Log the attempt + result in meta.json (media found / none / video-needs-browser-route). A stills fallback with no logged threads_media.py attempt FAILS the footage hunt."
+    - "MANDATORY X MEDIA HUNT (v2026.11.06): for an X-sourced pick, run pipeline/x_search.py on the surfacing post to hydrate direct media assets before falling back to stills. Download the highest-bitrate 1080p MP4 directly from video.twimg.com or high-res photos. Log the attempt + result in meta.json. For abstract finds or papers lacking source video, produce dynamic animated visuals via the Remotion engine (pipeline/animations/)."
     - "ENUMERATE THE ROOT PAGE (v2026.10.28.2): when the root source is an article or blog page, list EVERY visual on the page before choosing shots — do not stop at the first chart found. The main comparison table is often the strongest shot. 2026-10-28 proof: the Gemini Carbon clip shipped the blog's ExploitGym chart but missed the blog's main evals comparison table, which the user had to supply."
-    - "SAME-STORY SWEEP (v2026.10.28.1): also hunt the surfacing account's OTHER posts about the same story from the last 24h — a same-story post may carry the best visual. 2026-10-28 proof: kimmonismus's Gemini Carbon post carried Google's official benchmark chart while the official announcement post carried none. Use the underlying source media itself (chart, demo frame, announcement graphic) — never a screenshot of the post card."
-    - "Threads video posts from the source: the embed-page download route (the /media page yields only a poster frame for video — threads_media.py reports needs_browser_embed_route honestly). Threads images from the source: pipeline/threads_media.py first; microlink full screenshot of the /media viewer + own-end crop only if the script finds nothing. TikTok / X direct media: yt-dlp (~/workspace/tools/bin/yt-dlp). Never third-party downloader sites."
-    - "If the source has no video at all, fall back to 3_root_source_stills, then 4_narration_last — and say so in the run report, so the gap is visible instead of papered over with a post card."
+    - "SAME-STORY SWEEP (v2026.10.28.1): also hunt the surfacing account's OTHER posts about the same story from the last 24h — a same-story post may carry the best visual. Use the underlying source media itself (chart, demo frame, announcement graphic) — never a screenshot of a third-party intermediary post card."
+    - "X direct media & video: pipeline/x_search.py directly downloads broadcast MP4s via Twitter Syndication CDN. Screenshots of official posts: rendered at 2x dark-mode scale via pipeline/tweet_card.py. Never use third-party downloader websites."
+    - "If the source has no video at all, fall back to Remotion animation, then 3_root_source_stills, then 4_narration_last — and say so in the run report, so the gap is visible instead of papered over with a post card."
+
+curation_rules:
+  tiktok_worthiness_scorecard_2026_11_06:
+    rule: "Every candidate find must clear the Codified TikTok Worthiness Scorecard (scout/x_scout.py:excitement_gate_score) before video production. A find must score >= 28 / 40 total, with no individual pillar scoring below 6 / 10."
+    pillars:
+      1_hook_strength: "0-10 (min 6): Visceral curiosity under 3 seconds; immediate narrative tension."
+      2_educational_value: "0-10 (min 6): Demystifies real mechanisms, architectures, or paradigm shifts."
+      3_relatable_stakes: "0-10 (min 6): Broad public or developer impact vs narrow library internal config."
+      4_visual_potential: "0-10 (min 6): Native broadcast video demo, or dynamic Remotion animation (pipeline/animations/ BenchmarkLadder / ArchitectureDiagram awarded baseline 8/10 for benchmark/evals papers)."
+    hard_disqualifiers:
+      - "Routine plugins & integrations (e.g. ChatGPT iCloud Calendar)"
+      - "Incremental hardware spec bumps without AI paradigm shifts (e.g. XREAL Aura Android XR glasses)"
+      - "Legal & copyright disputes (e.g. NYT v Brave)"
+      - "Routine maintenance patches, dependency bumps, or bugfix changelogs"
 
 publish:
   mode: telegram_queue

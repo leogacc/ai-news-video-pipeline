@@ -46,6 +46,60 @@ GEMINI NOTE (user, 2026-10-28): the 2026-10-17 "no Gemini alerts" withdrawal cov
 
 THREADS PROFILE LISTING LAG (2026-10-28, user-supplied miss): Threads profile listings can lag new posts by 30+ minutes. Evidence: the 11am 2026-10-28 run paged kimmonismus and saved the Mario + MotionBricks posts via profile, but NEVER saw kimmonismus's 10:49 Gemini 4 Carbon post — it is absent from seen_threads_urls (108 entries), so the listing at run time simply did not contain a post 10–30 minutes old. Mitigation, every run: RE-PAGE each Threads profile at the END of the run (after the keyword passes) and save anything new — a second sweep catches posts that indexed mid-run. If an account's newest seen post predates the run window, say so in the run report (listing lag suspected). And when building a clip, sweep the surfacing account's same-story posts from the last 24h for media (see the clips template's SAME-STORY SWEEP rule).
 
+## The Codified TikTok Worthiness Scorecard (v2026.11.06)
+
+To eliminate subjective ambiguity and guarantee that every candidate selected for vertical video production commands immediate viewer attention, candidates are evaluated against a formalized **4-Pillar Scorecard** implemented in `scout/x_scout.py:excitement_gate_score()`.
+
+### The Passing Bar
+- **Total Score:** Must score $\ge 28$ out of $40$ possible points ($\ge 70\%$).
+- **No Weak Pillar:** Every individual pillar must score $\ge 6 / 10$. If any pillar is below 6, the item is disqualified from clip generation.
+- **Silent Exit:** If no candidate in a scout run clears this bar, the scout exits silently without producing a low-quality clip.
+
+### Tier 1: Explicit Disqualifiers (Automatic Reject, Score 0)
+Any post triggering one of these categories is immediately rejected before scoring:
+1. **Routine Plugins & Integrations:** *"Company X adds Y plugin / iCloud calendar integration"* (e.g., ChatGPT iCloud Mail/Calendar plugins).
+2. **Incremental Hardware Spec Bumps:** Product announcements without a fundamental new AI capability or paradigm shift (e.g., XREAL Aura Android XR glasses).
+3. **Legal & Copyright Lawsuits:** Court filings, regulatory inquiries, or copyright disputes where stakes are legal/financial rather than technical demonstrations (e.g., NYT v Brave).
+4. **Routine Maintenance Patches:** Minor version updates, dependency bumps, or bugfix changelogs.
+
+### Tier 2: The 4-Pillar Evaluation Rubric (0-10 each)
+
+| Pillar | Focus & Criteria | High Score (8–10) | Low Score (1–5) |
+|---|---|---|---|
+| **1. Hook Strength** | Visceral curiosity under 3 seconds; immediate narrative tension. | *"First ever", "100% autonomous", "beats o1", "built in 2 hours", "zero human"* | Patch releases, incremental changelogs, verbose abstract titles. |
+| **2. Educational Value** | Explains real mechanisms, architectures, algorithms, or paradigms. | Explains RL tree search, distillation, speculative decoding, weights, arxiv paper. | Pure hype, memes, reaction takes, or unsupported promotional claims. |
+| **3. Relatable Stakes** | Impact on average curious person vs narrow library developers. | Major lab releases (OpenAI, Anthropic, DeepSeek), general public impact, local inference. | Niche package configuration, internal database driver updates, dev tooling trivia. |
+| **4. Visual Potential** | Demonstrable motion vs static walls of text. | Native broadcast video, live working demo, or Remotion animation capability (`BenchmarkLadder`, `ArchitectureDiagram`). | Static screenshots of plain terminal text or markdown changelogs. |
+
+*Note on Abstract Finds / Research Papers:* Research papers or benchmark finds lacking native video receive a visual baseline of **8/10** when they can be animated dynamically using the pipeline's Remotion animation engine (`pipeline/animations/`).
+
+### Reference Case Studies
+
+#### Positive Case Studies (Passed & Clipped)
+1. **DeepSeek-R1 Open Reasoning Paper (`36 / 40` — PASS):**
+   - *Hook (9/10):* Open-source model matches OpenAI o1-preview on math competitions.
+   - *Educational (10/10):* Pure reinforcement learning without supervised fine-tuning.
+   - *Stakes (9/10):* Open weights available for local deployment worldwide.
+   - *Visual (8/10):* Remotion animated benchmark ladder + RL distillation architecture flow.
+2. **Karpathy's HackerTube (`35 / 40` — PASS):**
+   - *Hook (9/10):* Built an honest YouTube clone filtering 43M comments in 2 hours.
+   - *Educational (9/10):* Multi-stage Claude Code workflow with prompt decomposition.
+   - *Stakes (8/10):* Resonates with anyone exhausted by algorithmic feed slop.
+   - *Visual (9/10):* Working live demo screenshots and video screen captures.
+3. **OpenAI o3-mini Launch (`35 / 40` — PASS):**
+   - *Hook (9/10):* Breakthrough low-latency reasoning model accessible to free users.
+   - *Educational (9/10):* Detailed benchmark evals on SWE-bench and AIME.
+   - *Stakes (9/10):* Instant impact for millions of daily active users.
+   - *Visual (8/10):* Official launch graphs and Remotion metric counters.
+
+#### Negative Case Studies (Disqualified Below-the-Bar)
+1. **ChatGPT iCloud Mail/Calendar Plugins (DISQUALIFIED):**
+   - *Disqualification:* Routine integration update. No new reasoning capability or architectural shift.
+2. **XREAL Aura Android XR Glasses (DISQUALIFIED):**
+   - *Disqualification:* Hardware product announcement ($1,099 glasses) without an AI breakthrough.
+3. **NYT v Brave Lawsuit (DISQUALIFIED):**
+   - *Disqualification:* Legal copyright dispute. Stakes are litigation-based, not technical demonstrations.
+
 ## Dedupe and the major-progress exception
 
 Dedupe is tracked in TWO places, and both must be checked before
@@ -84,14 +138,11 @@ eligible pick, and a clip built from one must name its Threads source
 
 ## What it does, each run
 
-1. **Scout THREE sources, not one:**
-   - The accounts in `scout/accounts.yaml` (never guess accounts).
-   - The keyword searches in `scout/keywords.yaml` (the combined
-     `search_queries`, last 24h first). A keyword hit is not a story
-     by itself — it must be a notable post with source + date + author.
-   - The Threads accounts in `scout/threads.yaml`, via the Threads
-     connector (see "How Threads is accessed" below). A Threads hit
-     is subject to the MIRROR RULE in the dedupe section.
+1. **Scout TWO primary dimensions on X (Threads decommissioned):**
+   - The VIP accounts in `scout/accounts.yaml` via the official Twitter Syndication Timeline API (https://syndication.twitter.com/srv/timeline-profile/screen-name/<handle>). Never guess accounts.
+   - The keyword searches in `scout/keywords.yaml` via Google News RSS (`site:x.com <query>`). A keyword hit is not a story by itself — it must be a notable post with source + date + author.
+   - Single post hydration & media extraction: via Twitter Syndication CDN (`https://cdn.syndication.twimg.com/tweet-result?id=<id>&token=x`) for 1080p MP4s and dark-mode cards.
+   - Threads is permanently retired.
    - If NO source can be read at all, report “scout not configured”
      and stop. Do not publish anything, do not build anything, do
      not guess.
@@ -113,12 +164,10 @@ eligible pick, and a clip built from one must name its Threads source
 3. **SAVE EVERYTHING first, before building any video.** Append each
    classified item to `scout/saved_items.json` with: post_id, author,
    date, text, url, category (release/rumor/find), source
-   (account/keyword/threads + which account, query, or Threads handle),
+   (account/keyword + which account or query),
    and any verified link
-   (repo, announcement page). For Threads items, post_id is
-   `threads:<post code>` and url is the Threads permalink. Downstream
-   pipelines read this file.
-   Dedupe against `scout/state.json` and `pipeline/state.json` first.
+   (repo, announcement page). Downstream pipelines read this file.
+   Dedupe against `scout/state.json`, `scout/clipped_finds.json`, and `pipeline/state.json` first.
 4. **Releases AND Finds → clips, one clip per release/find**,
    following `templates/clips/template.yaml` in full (transcript scan,
    speaker scan, title + same-length bio, per-speaker face check, no-face

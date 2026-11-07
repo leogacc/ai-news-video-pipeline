@@ -22,6 +22,7 @@ import io
 import json
 import re
 import subprocess
+import shutil
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -29,7 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 RENDER_MJS = ROOT / "tweetshot" / "render.mjs"
-NODE = "/usr/bin/node"
+NODE = shutil.which("node") or "/usr/local/bin/node"
 
 ACCENT = "#1d9bf0"
 TEXT = "#e7e9ea"
@@ -50,11 +51,52 @@ def _get(url: str, timeout: int = 25) -> bytes:
     return r.stdout
 
 
-def _tweet_id(tweet_url: str) -> str:
+def _tweet_id(tweet_url: str) -> tuple[str, str]:
     m = re.search(r"(?:x|twitter)\.com/([^/?#]+)/status/(\d+)", tweet_url)
     if not m:
         raise ValueError(f"not a tweet URL: {tweet_url}")
     return m.group(1), m.group(2)
+
+
+def _fetch_syndication(sid: str) -> dict:
+    """Fetch official tweet payload from Twitter's public syndication CDN."""
+    raw = _get(f"https://cdn.syndication.twimg.com/tweet-result?id={sid}&token=x")
+    data = json.loads(raw.decode("utf-8"))
+    if not data.get("text") and not data.get("id_str"):
+        raise ValueError("syndication returned no tweet text")
+    user = data.get("user") or {}
+    is_verified = user.get("is_blue_verified") or user.get("verified") or False
+    vtype = "organization" if user.get("profile_image_shape") == "Square" else (
+        "blue" if is_verified else None)
+    
+    photos = []
+    for md in (data.get("mediaDetails") or []):
+        murl = md.get("media_url_https")
+        if murl:
+            photos.append({"url": murl})
+            
+    avatar_url = user.get("profile_image_url_https", "")
+    if "_normal." in avatar_url:
+        avatar_url = avatar_url.replace("_normal.", "_400x400.")
+        
+    text = data.get("text", "").replace("&gt;", ">").replace("&lt;", "<").replace("&amp;", "&")
+    
+    return {
+        "id": data.get("id_str", sid),
+        "text": text,
+        "created_at": data.get("created_at", ""),
+        "likes": data.get("favorite_count", 0),
+        "retweets": data.get("retweet_count", 0),
+        "replies": data.get("reply_count", 0),
+        "views": data.get("views", {}).get("count", 0) if isinstance(data.get("views"), dict) else (data.get("views") or 0),
+        "author": {
+            "name": user.get("name", "X User"),
+            "screen_name": user.get("screen_name", "x"),
+            "avatar_url": avatar_url,
+            "verification": {"verified": is_verified, "type": vtype},
+        },
+        "media": {"photos": photos},
+    }
 
 
 def _fetch_fxtwitter(handle: str, sid: str) -> dict:
@@ -122,8 +164,10 @@ def _data_uri(url: str, max_bytes: int = 2_000_000) -> str | None:
 
 
 def _fmt_count(n) -> str:
+    if n is None:
+        return ""
     try:
-        n = int(n or 0)
+        n = int(n)
     except (TypeError, ValueError):
         return ""
     if n >= 1_000_000:
@@ -136,18 +180,22 @@ def _fmt_count(n) -> str:
 
 
 def _fmt_date(created_at: str) -> str:
-    # "Sun Oct 18 18:07:51 +0000 2026" -> "6:07 PM · Oct 18, 2026".
+    # "Sun Oct 18 18:07:51 +0000 2026" or "2025-02-10T21:11:04.000Z" -> "9:11 PM · Feb 10, 2025".
     # oEmbed fallback already yields "October 18, 2026" — pass through.
-    if re.match(r"^[A-Z][a-z]+ \d{1,2}, \d{4}$", (created_at or "").strip()):
+    if not created_at:
+        return ""
+    if re.match(r"^[A-Z][a-z]+ \d{1,2}, \d{4}$", created_at.strip()):
         return created_at.strip()
     try:
-        dt = datetime.strptime(created_at, "%a %b %d %H:%M:%S %z %Y")
+        if "T" in created_at:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        else:
+            dt = datetime.strptime(created_at, "%a %b %d %H:%M:%S %z %Y")
         dt = dt.astimezone(timezone.utc)
         h = dt.strftime("%I").lstrip("0") or "0"
-        return f"{h}:{dt.strftime('%M %p')} · {dt.strftime('%b')} " \
-               f"{dt.day}, {dt.year}"
+        return f"{h}:{dt.strftime('%M %p')} · {dt.strftime('%b')} {dt.day}, {dt.year}"
     except Exception:
-        return created_at or ""
+        return created_at
 
 
 def _linkify(text: str) -> str:
@@ -313,12 +361,19 @@ def _build_html(t: dict) -> str:
 
 def _render_html_card(tweet_url: str, out_path: Path) -> Path:
     handle, sid = _tweet_id(tweet_url)
+    t = None
     try:
-        t = _fetch_fxtwitter(handle, sid)
-    except Exception as e:
-        print(f"[tweet_card] fxtwitter blocked ({e}) — oEmbed fallback")
-        t = _fetch_oembed_fallback(tweet_url)
-    if not t.get("text"):
+        t = _fetch_syndication(sid)
+        print(f"[tweet_card] syndication CDN: @{t['author'].get('screen_name')}")
+    except Exception as e_syn:
+        print(f"[tweet_card] syndication CDN failed ({e_syn}) — trying fxtwitter")
+        try:
+            t = _fetch_fxtwitter(handle, sid)
+            print(f"[tweet_card] fxtwitter: @{t['author'].get('screen_name')}")
+        except Exception as e_fx:
+            print(f"[tweet_card] fxtwitter blocked ({e_fx}) — oEmbed fallback")
+            t = _fetch_oembed_fallback(tweet_url)
+    if not t or not t.get("text"):
         raise ValueError("no tweet text from any source")
     page = _build_html(t)
     html_path = out_path.with_suffix(".html").resolve()

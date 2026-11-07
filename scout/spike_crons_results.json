@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-11-06T05:06:00Z",
+  "orchestration_platform": "Antigravity Cloud Crons (Option B)",
+  "warm_start_imports": {
+    "individual_latencies_s": {
+      "PIL (Pillow)": 0.0118,
+      "cv2 (OpenCV headless)": 0.0679,
+      "torch (PyTorch CPU)": 0.9283,
+      "av (PyAV pinned)": 0.0387,
+      "kokoro (TTS Engine)": 2.6365,
+      "yaml (PyYAML)": 0.0
+    },
+    "total_warm_import_s": 3.6832,
+    "gha_cold_start_comparison_s": 270.0,
+    "speedup_factor": 73.3
+  },
+  "secret_resolution": {
+    "env_file_exists": true,
+    "permissions": "0o600",
+    "secure_0600": true,
+    "keys_loaded": [
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_CHAT_ID",
+      "PIXABAY_API_KEY"
+    ],
+    "missing_keys": []
+  },
+  "state_concurrency": {
+    "state.json": {
+      "size_kb": 40.49,
+      "item_count": 8,
+      "read_latency_s": 0.00017,
+      "write_latency_s": 0.00078
+    },
+    "saved_items.json": {
+      "size_kb": 254.67,
+      "item_count": 331,
+      "read_latency_s": 0.0025,
+      "write_latency_s": 0.00393
+    },
+    "clipped_finds.json": {
+      "size_kb": 51.39,
+      "item_count": 42,
+      "read_latency_s": 0.00027,
+      "write_latency_s": 0.00088
+    }
+  },
+  "model_cache": {
+    "kokoro_cached": true,
+    "yunet_face_model": {
+      "exists": true,
+      "path": "/home/antigravity/leogacc/ai-news-video-pipeline/pipeline/cache/models/face_yunet.onnx",
+      "size_kb": 227.1
+    },
+    "kokoro_init_latency_s": 1.662
+  },
+  "headless_chromium": {
+    "node_path": "/usr/local/bin/node",
+    "render_latency_s": 1.501,
+    "success": true,
+    "stderr": ""
+  }
+}

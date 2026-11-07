@@ -1,23 +1,24 @@
 # AI News Video Pipeline
 
 Turns AI news into short vertical videos, and clips the single most interesting AI find four times a day.
-Pipeline version **2026.11.05.7** (`pipeline/VERSION`, 2026-11-05). Repo: `github.com/leogacc/ai-news-video-pipeline`.
+Pipeline version **2026.11.06.9** (`pipeline/VERSION`, 2026-11-06). Repo: `github.com/leogacc/ai-news-video-pipeline`.
 
 This README is the handover for an agent taking over operations. It states the current state first, then how to run things.
-The live rules are in `scout/README.md`, `templates/clips/template.yaml`, and `pipeline/CHANGELOG.md` — read those in full before touching anything.
+The live rules are in `scout/README.md`, `templates/clips/template.yaml`, `docs/ROADMAP.md`, and `REPORT.md` (TikTok growth blueprint) — read those in full before touching anything.
+`pipeline/CHANGELOG.md` tracks all versions and verified fixes.
 `AGENT_GRAPH.md` is design background only; its schedule, voice, and LLM-stage descriptions are outdated — do not run from it.
 
-## READ THIS FIRST — current state (2026-11-05)
+## READ THIS FIRST — current state (2026-11-06)
 
-The user shut down everything except the finds scout on 2026-10-28. **Do not restart the paused jobs.**
-They are disabled, not deleted, and return only on the user's word.
+The pipeline is fully cut over to the automated Free X Search and Remotion animation architecture. Threads has been decommissioned and archived in `archive/threads/`.
+The 4x-daily scout crons run automatically via `scout/x_scout.py --run-cron`. Paused jobs remain disabled.
 
 | Job | Schedule (PT) | Status |
 |---|---|---|
-| `x-scout-finds-7am` | 07:00 | RUNNING |
-| `x-scout-releases-rumors` | 11:00 | RUNNING |
-| `x-scout-finds-4pm` | 16:00 | RUNNING |
-| `x-scout-finds-7pm` | 19:00 | RUNNING |
+| `x-scout-finds-7am` | 07:00 | RUNNING (`scout/x_scout.py --run-cron`) |
+| `x-scout-releases-rumors` | 11:00 | RUNNING (`scout/x_scout.py --run-cron`) |
+| `x-scout-finds-4pm` | 16:00 | RUNNING (`scout/x_scout.py --run-cron`) |
+| `x-scout-finds-7pm` | 19:00 | RUNNING (`scout/x_scout.py --run-cron`) |
 | `muse-video-pipeline-daily` (daily video) | 18:00 | DISABLED |
 | `x-news-daily-scan` (daily X scan) | 17:00 | DISABLED |
 | `pipeline-fix-until-video-lands` (watchdog) | every 2h | DISABLED |
@@ -25,8 +26,8 @@ They are disabled, not deleted, and return only on the user's word.
 | `daily-ai-news-digest` (text digest) | 11:00 | DISABLED |
 | `meal-log-evening-nudge` | 21:53 | DISABLED |
 
-The four scout jobs share one body and the same state files; each run re-checks dedupe before picking.
-Job definitions live in `crons/` (one file per job, `enabled: false` on the paused ones). The only live work right now is the scout loop below.
+The four scout jobs share one body and the same state files; each run re-checks dedupe and evaluates posts through the **TikTok Worthiness Scorecard** ($\ge 28/40$, no pillar $< 6$). Runs with zero passing candidates exit silently without publishing.
+Job definitions live in `crons/` (one file per job, `enabled: false` on the paused ones). The primary production workflow is driven by `scout/x_scout.py --run-cron`.
 The weekly 16:9 long-form is deferred until the daily format is locked — do not start it.
 
 The user is the creative director. They watch every render and reply with frame-by-frame corrections, often timestamped.
@@ -43,113 +44,119 @@ The daily digest (5 stories, same format, most-interesting-first) is PAUSED with
 
 ## The operator loop (scout)
 
-One run, in order (full rules: `scout/README.md`, job bodies in `crons/`):
+One automated run, in order (executed via `scout/x_scout.py --run-cron`):
 
-1. **Scout** the accounts in `scout/accounts.yaml`, the combined queries in `scout/keywords.yaml` (X and Threads, back up to 3 months), and the Threads accounts in `scout/threads.yaml`. Never scout an account that is not listed. Never guess accounts.
-2. **Classify** each notable post as RELEASE (official announcement), RUMOR (unconfirmed/leak), or FIND (general AI find — tools, demos, projects, research, benchmarks; never the "Hacks" label, and never hack-specific terms as primary search terms). Skip hype, memes, and engagement bait, and log why.
-3. **Save everything first** to `scout/saved_items.json` (post_id, author, date, text, url, category, source, verified link). Rumors are saved only — the rumors digest handles them, and it is paused. Releases are part of finds: a release is picked and clipped exactly like a find, labelled FIND.
-4. **Pick at most ONE top find or release.** Rank by what is most interesting, pressing, exciting, or important for the AVERAGE INTERESTED PERSON — broad appeal beats a technically neat but narrow find. Recency is only a tie-breaker. If nothing clears the bar, build nothing and end silently (state and saved pool only).
-5. **Dedupe** before building: `scout/state.json` (seen/posted ids), `scout/clipped_finds.json`, and `pipeline/state.json` posted ids. A clipped or posted item is never rebuilt — except the major-progress exception: a substantive new development (new major version or official release, materially changed capability or benchmark, confirmation that changes the story — not a repost, an engagement bump, or a minor bugfix). A major-progress re-clip is labelled as an update in its description ("Update on X — previously clipped on <date>"), says what is new, and is appended to `scout/clipped_finds.json` as an update entry against the original post_id.
-6. **Build the clip** per `templates/clips/template.yaml` (below).
-7. **Publish** to Telegram (below). **Report** to the user only when a clip lands: the find, why it topped the run, the clip, its source, and what was skipped and why. No-clip runs stay silent.
-8. **Concurrency:** never leave multiple runs in flight; never build while another scout run or the daily pipeline is rendering. If another run is rendering, do a save-only pass (steps 1–3 and 5).
+1. **Scout** the VIP accounts in `scout/accounts.yaml` and keyword queries in `scout/keywords.yaml` using Free X Search (`pipeline/x_search.py` via Twitter Syndication API, Google News RSS fallback, and Hacker News dispatches). Threads has been decommissioned and archived in `archive/threads/`.
+2. **Classify** each notable post as RELEASE (official announcement), RUMOR (unconfirmed/leak), or FIND (general AI find — tools, demos, projects, research, benchmarks). Skip hype, memes, and engagement bait, and log why.
+3. **Save everything first** to `scout/saved_items.json` (post_id, author, date, text, url, category, source, verified link). Rumors are saved only. Releases are part of finds: a release is picked and clipped exactly like a find, labelled FIND.
+4. **Evaluate via TikTok Worthiness Scorecard (`scout/x_scout.py:excitement_gate_score`)**:
+   - **Tier 1 Hard Disqualifiers**: Immediate rejection (0/40) for routine plugins/integrations, minor hardware spec bumps without AI shifts, legal/lawsuit disputes, and routine bugfixes.
+   - **Tier 2 4-Pillar Rubric**: Evaluated on Hook Strength (0-10), Educational Value (0-10), Relatable Stakes (0-10), and Visual Potential (0-10; benchmark/paper finds receive an 8/10 baseline due to Remotion animations).
+   - **Passing Threshold**: Total $\ge 28 / 40$, with no single pillar $< 6 / 10$.
+   - **Silent Exit**: If zero candidates clear the bar, terminate cleanly with exit code 0 without sending Telegram messages.
+5. **Dedupe** before building: `scout/state.json` (seen/posted ids), `scout/clipped_finds.json`, and `pipeline/state.json` posted ids. A clipped or posted item is never rebuilt except for substantive new developments (major version release, materially changed capability/benchmark).
+6. **Build the clip** declaratively via `pipeline/assemble.py` per `templates/clips/template.yaml` (Dynamic Hug overlays, Kokoro TTS `am_echo` 1.20x, ASS typewriter captions, -14 LUFS loudnorm).
+7. **Automated QA Gate**: Verified through `pipeline/qa.py --clip`. A clip must strictly satisfy all checks (1080x1920, 30fps, H.264 High L4.0, faststart, audio sync & loudness, top-anchored safe area captions, edge-slice check on verification stills) or assembly aborts.
+8. **Publish** to Telegram review queue (`pipeline/publish.py` -> `@aividpipBOT`). Reports to the user only when a verified clip lands. No-clip runs stay completely silent.
 
-State as of 2026-11-05: `scout/saved_items.json` 331 items, `scout/clipped_finds.json` 42 entries, `scout/state.json` seen_post_ids 315, posted_find_ids 42.
+## Quickstart
 
-### The excitement gate
+```bash
+# 1. Bootstrap environment (Python 3.12, Kokoro weights, Node/Remotion, .env)
+./setup_env.sh
 
-"Exciting" is a GATE, not a ranking factor (`scout/README.md`). A top pick must be genuinely exciting for the average interested person — surprising, big, first-of-its-kind, high-stakes, or viscerally interesting. These do NOT clear it, no matter how recent or well-sourced:
+# 2. Run automated cloud crons scout cycle (dry-run or live)
+.venv/bin/python3 scout/x_scout.py --run-cron --dry-run
+.venv/bin/python3 scout/x_scout.py --run-cron
 
-- Routine / incremental stories, including "company X adds Y support". Named example: 2026-10-27 ChatGPT iCloud Mail/Calendar plugins.
-- Product and hardware launches, even first-in-category with a polished demo. Named example: 2026-10-28 XREAL Aura XR glasses. First-in-category is not exciting on its own; the bar needs a surprising capability, an unexpected crossover, or stakes beyond the product.
-- Legal-dispute stories, on scale or stakes alone. Named example: 2026-11-02 NYT v Brave lawsuit.
+# 3. Run automated QA gate on any rendered clip
+.venv/bin/python3 pipeline/qa.py --clip pipeline/output/scout/clips/sample_paper_find
 
-If the pool's best is merely interesting, build nothing, end silently, and log the skip with reason "not exciting".
-
-Note: the 2026-10-17 "no Gemini alerts" withdrawal covers personal alert pings ONLY. Gemini finds and releases stay eligible for clips — never skip a Gemini item on the alerts basis.
+# 4. Run the full unit regression test suite (41 tests)
+.venv/bin/python3 -m unittest scout/test_cron_runner.py scout/test_scorecard.py pipeline/test_assemble.py pipeline/test_animations.py pipeline/test_x_search.py pipeline/test_tweet_card.py pipeline/test_qa_clip.py
+```
 
 ## Repo layout
 
 ```
-pipeline/            # the code
-  run.py             # orchestrator (daily/weekly modes; --skip ingest,write)
-  render.py          # frame + caption generation (PIL frames, .ass captions)
-  tts.py             # Kokoro TTS, word timings, delivery guarantees, fingerprint cache
-  captions.py        # per-letter typewriter captions (.ass)
-  clip_frames.py     # shared narrated-clip frame builder (dynamic hug, watermark)
-  publish.py         # Telegram review queue
-  visuals.py         # visual sourcing: verified pins, screenshots, stock b-roll
-  threads_media.py   # Threads post media extraction (see traps below)
-  selfplug.py        # branding / follow-CTA montage (daily, paused)
-  qa.py              # blocking QA gate
-  ingest.py write.py # daily scan + script writing (paused)
-  analytics.py beats.py pin_edge_check.py test_tts.py tweet_card.py
-  config.yaml        # tunables (voice, speed, geometry, QA thresholds)
-  VERSION            # current pipeline version, one line (YYYY.MM.DD.N)
-  CHANGELOG.md       # version history, newest first
-  state.json         # daily dedupe log
-  requirements.txt   # Python deps (torch is installed separately, CPU-only)
-  assets/            # music bed (.disabled) — never re-enable it
-  cache/ output/     # local-only working cache and renders — regenerable, not in the repo
-templates/
-  clips/template.yaml         # THE clip template — read in full before any clip build
-  daily-digest/template.yaml  # daily digest template (paused)
-  montage-edit/template.yaml  # portrait montage grammar (manual edits, not scout picks)
-  rumors-digest/template.yaml # rumors digest template (paused)
-scout/
-  README.md           # scout runbook — read in full before any scout run
-  accounts.yaml       # X accounts to scout (never guess others)
-  keywords.yaml       # combined search queries (X + Threads)
-  threads.yaml        # Threads accounts to scout
-  saved_items.json    # central saved pool — ALL pipelines read this first
-  state.json          # seen/posted ids, seen Threads permalinks, last run
-  clipped_finds.json  # one entry per clipped find (+ update entries)
-  runs/ threads_footage/  # per-run reports (local-only, not in the repo); media pulled by threads_media.py
-skills/               # local motion/video skills (read before touching renders)
-  local-pipeline-upgrade/SKILL.md  # the versioned upgrade flow (below)
-  local-motion-language/SKILL.md   # channel motion personality + tokens
-  local-shot-grammar/SKILL.md      # shot-selection grammar (literal visuals)
-  local-short-form-video/SKILL.md  # vertical short-form grammar
-  local-explainer-video/SKILL.md   # script -> storyboard -> render
-  local-animated-data-visualization/SKILL.md  # + other local-* motion skills
-crons/                # scheduled-job definitions (one file per job)
-  x-scout-finds-7am, x-scout-releases-rumors (11:00), x-scout-finds-4pm, x-scout-finds-7pm
-  muse-video-pipeline-daily, x-news-daily-scan, rumors-digest-daily-6am, daily-ai-news-digest  # DISABLED, preserved
-.github/workflows/
-  daily.yml weekly.yml  # GitHub Actions fallback; schedules DISABLED, manual dispatch only
-run_vm.sh             # VM runner: loads .env, runs run.py --mode daily --skip ingest,write
-AGENT_GRAPH.md        # original design doc — background only, see the note at the top
+pipeline/            # Core processing engine
+  x_search.py        # Free X Search engine (Syndication API + Google News RSS + Algolia)
+  tweet_card.py      # Dark-mode 2x official post renderer (Syndication + Chromium)
+  animations.py      # Remotion integration wrapper (BenchmarkLadder, ArchitectureDiagram, KineticMetricCounter)
+  animations/        # Remotion React/TypeScript compositions root
+  assemble.py        # Declarative clip assembler (Dynamic Hug video overlays, Kokoro TTS, ASS captions, loudnorm)
+  qa.py              # Automated Clip QA Gate (--clip <dir>, enforces 1080x1920, 30fps, H.264 High L4.0, loudnorm, captions, pin_edge)
+  clip_frames.py     # Shared Dynamic Hug frame builder and transparent video overlay generator
+  tts.py             # Kokoro TTS (am_echo 1.20x), token-level timestamps, sanitized proxy handling
+  captions.py        # Per-letter typewriter ASS caption generator (neon green #39FF14, top-anchored MarginV >= 1400)
+  publish.py         # Telegram review queue dispatcher (@aividpipBOT)
+  pin_edge_check.py  # OCR / slice detector ensuring no truncated headline ascenders/descenders
+  config.yaml        # Pipeline tunables (voice, geometry, loudness, safe areas)
+  VERSION            # Single-line semantic version (2026.11.06.8)
+  CHANGELOG.md       # Chronological version changelog
+scout/               # Discovery & Curation
+  x_scout.py         # Automated cloud crons runner (--run-cron), 4-pillar scorecard, Telegram delivery
+  accounts.yaml      # VIP X accounts to monitor (OpenAI, DeepSeek, Anthropic, leaders)
+  keywords.yaml      # High-signal discovery queries
+  saved_items.json   # Central saved pool
+  state.json         # Deduplication tracking (seen IDs, run timestamps)
+  clipped_finds.json # History of assembled and published clips
+crons/               # Scheduled Cloud Crons definitions (4x daily: 07:00, 11:00, 16:00, 19:00 PT)
+archive/             # Decommissioned components
+  threads/           # Archived Threads crawler (threads_media.py, threads.yaml)
+setup_env.sh         # Hermetic environment bootstrapper
 ```
 
 ## Setup
 
-1. Python 3.12 venv (workflows use 3.11; either works): `python3.12 -m venv .venv && .venv/bin/pip install -r pipeline/requirements.txt`. Install torch separately from the CPU-only index (see `.github/workflows/daily.yml`); a `--index-url` line is not valid inside `requirements.txt`.
-2. `ffmpeg` on PATH.
-3. Kokoro TTS + faster-whisper models are cached under `~/.cache/huggingface/hub/`. For offline model use: clear proxy env vars and set `HF_HUB_OFFLINE=1` (see `run_vm.sh` — the runtime injects bracketed IPv6 `no_proxy` values that break httpx parsing).
-4. Copy `.env.example` to `.env` (0600, never committed) and fill in the values: `PIXABAY_API_KEY=...` (illustrative b-roll only), `TELEGRAM_BOT_TOKEN=...`, `TELEGRAM_CHAT_ID=...`. `GEMINI_API_KEY` is also referenced by the workflows and the paused daily write stage; it is not needed for the scout loop.
-5. `yt-dlp` at `~/workspace/tools/bin/yt-dlp` for TikTok / X direct media. It has no Threads extractor.
-6. Run the mechanical stages (daily mode is paused — manual / resumed runs only): `./run_vm.sh daily`.
+1. Run `./setup_env.sh` to initialize Python venv, install PyTorch (CPU-only), Kokoro TTS offline weights cache, Node/Remotion dependencies, and verify system binaries (`ffmpeg`, `node`, `npm`).
+2. Populate `.env` (`chmod 0600 .env`):
+   - `TELEGRAM_BOT_TOKEN=...` (Bot token for `@aividpipBOT`)
+   - `TELEGRAM_CHAT_ID=1904835992` (Review queue chat ID)
+   - `PIXABAY_API_KEY=...` (Illustrative b-roll fallback)
+3. Ensure `ffmpeg` and `node >= 18` are on `PATH`.
 
-## Run a scout run (manual)
+## Declarative Clip Assembly
 
-Follow `scout/README.md` and the job body in `crons/` — the summary in "The operator loop" above is not a substitute. Notes that matter:
+Every clip is assembled declaratively via `pipeline/assemble.py`:
 
-- X has no connector and no saved login. Use public methods only: public post pages, fxtwitter API via curl, web search, microlink screenshots. X timelines are often unreadable (Cloudflare, 404, profile-only 200, HTML instead of JSON) — report unreadable accounts with the next published clip, never guess at them. When fxtwitter returns 404 for a post, the vxtwitter API works, and direct twimg mp4 URLs download cleanly. Never start a login flow on your own and never push the user for an X login.
-- Threads is connected via `threads-cli` on the user's linked account. Resolve each listed account every run from the linked account's following list — never hardcode numeric user IDs, never scrape threads.com. Page `profile-threads` at most 3 pages per run, stop at the first post already in `scout/saved_items.json`. A 429 ends ALL Threads calls for that run — stop, do not retry. Re-page each profile at the END of the run: Threads listings lag new posts ~30 minutes. Record seen permalinks in `scout/state.json` `seen_threads_urls`.
-- A Threads post mirroring an already-saved X post (same author, same story, same day, near-identical text) is coverage, not a new find: save it noting the X post_id it mirrors, and NEVER pick it on its own. Only Threads posts with no X counterpart are eligible picks.
-- Threads keyword search runs the same combined queries as X, via `threads-cli search` (Top tab; `--recent 1` only if Top returns nothing notable; max 1 page per call). Save hits as `threads:keyword:<query>` with the Threads permalink.
+```python
+from pipeline.assemble import assemble_clip
 
-## Build a narrated clip from a find
+spec = {
+    "title": ["DEEPSEEK-R1", "REASONING MODEL"],
+    "bio": "Source: DeepSeek AI, Jan 2025",
+    "script": "DeepSeek just open-sourced R1, rivaling OpenAI o1 at a fraction of the cost.",
+    "shots": [
+        {"type": "tweet_card", "tweet_id": "1882627116931752146", "duration": 5.5},
+        {
+            "type": "animation",
+            "composition": "BenchmarkLadder",
+            "props": {
+                "headline": "AIME 2024 Math Accuracy",
+                "items": [
+                    {"label": "DeepSeek-R1", "score": 79.8, "highlight": True},
+                    {"label": "OpenAI o1-preview", "score": 79.2, "highlight": False},
+                ],
+                "benchmark_max": 100
+            },
+            "duration": 8.0
+        }
+    ]
+}
 
-One folder per clip: `pipeline/output/scout/clips/<date>_<slug>/`. The per-clip pattern (see any recent folder, e.g. `20261105_kimi_k3_in_c` or `20261105_gpt6_cyber_launch`):
+assemble_clip(spec, output_dir="pipeline/output/scout/clips/my_clip")
+```
 
-1. `script.json` — title, `sentences` (the narration, verified text only — no invented facts, dates, or quotes), `bio_lines` (one element: the Source line, see below), shot list.
-2. `tts_driver.py` — synthesizes the narration sentence by sentence via `pipeline/tts.py` (`seg_wav`), assembles `narration.wav` (segments + 0.2s gaps), writes `words.json` / `sentences.json` (word timings from Kokoro's own tokens).
-3. `render.py` — generates `frame_*.png` via `pipeline/clip_frames.py` (dynamic hug) and `captions.ass` (terminal typewriter, top-anchored).
-4. `assemble.py` — slices `narration.wav` at the shot boundaries, builds each shot segment, concats, loudnorms the full narration (two-pass, I=−14/−15, TP=−1.5, LRA=11; see the clip's assemble.py for its exact target), burns `captions.ass`, faststart. ffmpeg `alimiter` takes a LINEAR limit (0.0625–1), not dB — `limit=-1dB` mis-parses and RAISES peaks. Never use it.
-5. `finalize.py` — writes `description.txt` + `meta.json`, checks the Flesch-Kincaid gate (≤ 9.5) and the watermark geometry, records the file md5/size. QA before publishing: ffprobe clean, no black segments, frames eye-verified at start/middle/end, captions top-anchored with zero caption-green above y1500, watermark beneath the bio.
+The assembler automatically:
+1. Synthesizes Kokoro voiceover (`am_echo` 1.20x) with token-level timestamps.
+2. Generates Remotion video cutaways and Dynamic Hug overlays.
+3. Concat-filters all shots seamlessly with hard cuts.
+4. Normalizes audio to -14 LUFS (`loudnorm=I=-14:LRA=11:TP=-1.0`).
+5. Burns top-anchored `#39FF14` neon green typewriter captions.
+6. Executes the strictly blocking **Automated QA Gate** (`pipeline/qa.py --clip`).
 
-Source-video clips (the source has usable audio/video) follow the same folder pattern but keep the source audio and use the source footage as the backbone — see `templates/clips/template.yaml` `footage_priority_2026_10_27`. A narrated clip can also use moving video shots, not just stills: per-shot transparent RGBA overlays (title + bio + watermark, dynamic-hug geometry) composited over trimmed video segments — see `20261105_swarm_site` (`build_overlays.py` + `assemble.py`).
+Source-video clips (the source has usable audio/video) follow the same declarative specification with `"type": "video"`, preserving source audio or compositing narration with Dynamic Hug transparent overlays.
 
 ## Rebuild a clip as v2 / v3
 
@@ -188,10 +195,9 @@ Summaries only — the template file is the authority. Read `templates/clips/tem
 - **Block style**: title and bio text WHITE, both blocks 50% transparent black, blurred, feathered edge — never a hard opaque panel. Captions stay terminal green.
 - **Captions**: terminal green per-letter typewriter, trailing block cursor, TOP-ANCHORED (ASS alignment 7, one fixed style MarginV) — first glyph row ~1530 on every frame. Line breaks are deferred to the next line's first letter (never a cursor-only line). No new captions when burnt-in subtitles are present.
 - **TTS delivery guarantees** (`pipeline/tts.py`, v2026.11.05.1): segment-initial words get a disposable warm-up word ("Well,") absorbing Kokoro's soft onset, then trimmed — first words attack cleanly. After every comma lacking a ≥0.15s pause, 0.22s of silence is spliced in; the pause detector measures only silence after the word ends. Regression tests: `pipeline/test_tts.py`.
-- **Footage priority**: (1) source/company explaining on video, with its own audio, as the backbone; (2) other useful footage as cutaways; (3) vision-cropped root-source stills only when no video exists; (4) narration last. NEVER a third-party surfacing post as a visual — a surfacing-post visual FAILS QA. No pure-text shots (numbers ride real visuals only — charts, banners, tickers, callouts — or the figure is dropped). Eye-verify every segment; video must move; source audio first; hard cuts only.
-- **Footage hunt** (mandatory for Threads-sourced picks): run `pipeline/threads_media.py` on the surfacing post BEFORE any stills fallback and log the attempt + result in `meta.json`. Also sweep the surfacing account's other same-story posts from the last 24h, and when the root source is an article/blog page, list EVERY visual on the page before choosing shots. The script fetches through curl, not Python urllib, and keeps the bare `Mozilla/5.0` user agent — "improving" either gets a reduced page with no media URLs. Video posts yield only a poster from that route; Threads video needs the browser embed-page download. TikTok / X direct media: `yt-dlp`.
+- **Footage priority**: (1) source/company explaining on video, with its own audio, as the backbone; (2) other useful footage as cutaways; (3) Remotion motion graphics (`BenchmarkLadder`, `ArchitectureDiagram`, `KineticMetricCounter`) for abstract finds, benchmark comparisons, and research papers; (4) vision-cropped root-source stills only when no video exists; (5) narration last. NEVER a third-party surfacing post as a visual. No pure-text shots.
 - **No mid-screen text without an analytical chart.** Visuals change exactly when the narration's subject changes; an evidence shot never shows its subject before the subject is named.
-- **QA bar**: no black frames, no file that fails ffprobe, no verification walls or popups, headlines fully in frame. A render only counts as done once it is in the Telegram review queue.
+- **QA bar**: no black frames, no file that fails ffprobe, no verification walls or popups, headlines fully in frame. A render only counts as done once it passes `pipeline/qa.py --clip` and is delivered to the Telegram review queue.
 
 ## What's paused / do not touch
 
@@ -212,11 +218,8 @@ Summaries only — the template file is the authority. Read `templates/clips/tem
 
 ## Known limits and traps
 
-- X timelines are often unreadable from public methods (see "Run a scout run"). Threads is the reliable source right now; every recent pick came via Threads.
-- Threads profile listings lag new posts ~30 minutes — re-page at the end of every run.
-- The Threads connector returns text only, never media — a hunt that stops at the connector has not hunted at all.
-- `pipeline/threads_media.py` must use curl with a bare `Mozilla/5.0` UA (see above). On multi-image carousels it extracts only the first image.
-- Microlink screenshots (`pipeline/visuals.py`) are mobile-viewport (500x900); Reuters bot-walls them. Chromium CLI screenshots produce nothing in this environment — use microlink or the browser.
+- Free X Search utilizes public Twitter Syndication endpoints, Google News RSS (`site:x.com`), and Algolia HN dispatches. When Syndication is temporarily rate-limited, the system automatically falls back to Google News RSS search.
+- Remotion renders require headless Chromium. Ensure Node dependencies are installed via `./setup_env.sh`.
 - The VM is memory-constrained (~500MB real headroom, no swap); renders are single-flight. `run.py` hands off to `render.py` as a separate process — killing the wrapper does not stop the render; kill `render.py` itself plus orphaned ffmpeg children, then verify `ps` is clean.
 - `/tmp` is small and cleaned between turns — keep anything needed under `~/workspace/`, and keep source media inside the clip folder.
 - `AGENT_GRAPH.md` is stale background (see the note at the top). The daily-digest rules in the old root README (cold open, person photos as hook heroes, 1.10x voice) are superseded — this file replaces that README as the handover.

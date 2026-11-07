@@ -13,8 +13,20 @@ if (!htmlPath || !selector || !outPng) {
   process.exit(2);
 }
 
+const chromeCandidates = [
+  process.env.PUPPETEER_EXECUTABLE_PATH,
+  '/usr/bin/chromium',
+  '/usr/bin/google-chrome',
+  '/opt/meta-chromium/chrome',
+  '/usr/bin/chromium-browser'
+].filter(Boolean);
+const executablePath = chromeCandidates.find(p => fs.existsSync(p));
+if (!executablePath) {
+  throw new Error('No Chromium / Chrome binary found');
+}
+
 const browser = await puppeteer.launch({
-  executablePath: '/opt/meta-chromium/chrome',
+  executablePath,
   args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
          '--force-color-profile=srgb', '--font-render-hinting=none'],
   headless: true,

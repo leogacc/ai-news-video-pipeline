@@ -35,7 +35,7 @@ FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 FONT_SIZE = 68
 LINE_H = int(FONT_SIZE * 1.30)          # 88
 MAX_W = 1080 - 120
-CAPTION_TOP = 1450                     # legacy: pre-2026-10-26 bottom-anchor reference; captions now top-anchor via the style MarginV (1513)
+CAPTION_TOP = 1180                     # Safe-zone reference: top-anchored at y=1180 above TikTok bottom UI overlay
 GREEN = "&H0014FF39"                    # #39FF14 neon (ASS &HAABBGGRR)
 
 
@@ -176,7 +176,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Terminal,DejaVu Sans Mono,{FONT_SIZE},{GREEN},&HFF000000,&HFF000000,&H00000000,-1,0,0,0,100,100,0,0,1,0,0,7,60,60,1513,1
+Style: Terminal,DejaVu Sans Mono,{FONT_SIZE},{GREEN},&HFF000000,&H40000000,&H40000000,-1,0,0,0,100,100,0,0,3,14,0,7,60,60,1180,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

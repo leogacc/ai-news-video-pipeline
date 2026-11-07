@@ -34,34 +34,23 @@ def sig(spans):
     return wav
 
 
-def check(name, wav, b, expect):
-    got = _has_pause(wav, SR, b)
-    status = "PASS" if got == expect else "FAIL"
-    print(f"[{status}] {name}: _has_pause={got} (expect {expect})")
-    return got == expect
+import unittest
 
 
-ok = True
-# 1. tail + short pause: quiet 0.05s before b, 0.08s after -> INSERT
-ok &= check("tail+short-pause inserts",
-            sig([(0, 0.60, 0.1), (0.60, 0.73, 0.0), (0.73, 2.0, 0.1)]),
-            0.65, False)
-# 2. true 0.16s pause starting at b -> SKIP
-ok &= check("0.16s true pause skips",
-            sig([(0, 0.65, 0.1), (0.65, 0.81, 0.0), (0.81, 2.0, 0.1)]),
-            0.65, True)
-# 3. continuous speech -> INSERT
-ok &= check("continuous speech inserts",
-            sig([(0, 2.0, 0.1)]), 0.65, False)
-# 4. inserted 0.22s zeros after b -> SKIP
-ok &= check("inserted 0.22s zeros skip",
-            sig([(0, 0.65, 0.1), (0.65, 0.87, 0.0), (0.87, 2.0, 0.1)]),
-            0.65, True)
-# 5. REGRESSION 2026-11-05: quiet straddles b (0.15s before, 0.06s
-#    after); only 0.06s of real post-word pause -> INSERT.
-ok &= check("fricative-tail straddle inserts (2026-11-05)",
-            sig([(0, 0.50, 0.1), (0.50, 0.71, 0.0), (0.71, 2.0, 0.1)]),
-            0.65, False)
+class TestTTSPauseDetection(unittest.TestCase):
+    def test_cases(self):
+        # 1. tail + short pause: quiet 0.05s before b, 0.08s after -> INSERT
+        self.assertFalse(_has_pause(sig([(0, 0.60, 0.1), (0.60, 0.73, 0.0), (0.73, 2.0, 0.1)]), SR, 0.65))
+        # 2. true 0.16s pause starting at b -> SKIP
+        self.assertTrue(_has_pause(sig([(0, 0.65, 0.1), (0.65, 0.81, 0.0), (0.81, 2.0, 0.1)]), SR, 0.65))
+        # 3. continuous speech -> INSERT
+        self.assertFalse(_has_pause(sig([(0, 2.0, 0.1)]), SR, 0.65))
+        # 4. inserted 0.22s zeros after b -> SKIP
+        self.assertTrue(_has_pause(sig([(0, 0.65, 0.1), (0.65, 0.87, 0.0), (0.87, 2.0, 0.1)]), SR, 0.65))
+        # 5. REGRESSION 2026-11-05: quiet straddles b -> INSERT
+        self.assertFalse(_has_pause(sig([(0, 0.50, 0.1), (0.50, 0.71, 0.0), (0.71, 2.0, 0.1)]), SR, 0.65))
 
-print("ALL PASS" if ok else "SOME FAILED")
-sys.exit(0 if ok else 1)
+
+if __name__ == "__main__":
+    unittest.main()
+
