@@ -34,6 +34,8 @@ SUPPORTED_COMPOSITIONS = {
     "ArchitectureDiagram",
     "KineticMetricCounter",
     "TweetCard3D",
+    "PersistentHookBanner",
+    "DocumentZoom",
 }
 
 
@@ -270,6 +272,33 @@ def render_tweet_card_3d(
 
     return render_animation(
         composition="TweetCard3D",
+        props=props,
+        output_path=output_path,
+        duration_frames=duration_frames,
+    )
+
+
+def render_document_zoom(
+    source_name: str,
+    headline: str,
+    quote_text: str,
+    output_path: Union[str, Path],
+    badge: str = "VERIFIED DISPATCH",
+    source: str = "Source: Primary Source Investigation",
+    image_src: str = "",
+    duration_frames: int = 90,
+) -> Path:
+    """Renders a DocumentZoom composition zooming onto an article quote with highlighter sweep."""
+    props: Dict[str, Any] = {
+        "sourceName": source_name,
+        "headline": headline,
+        "quoteText": quote_text,
+        "badge": badge,
+        "source": source,
+        "imageSrc": image_src,
+    }
+    return render_animation(
+        composition="DocumentZoom",
         props=props,
         output_path=output_path,
         duration_frames=duration_frames,

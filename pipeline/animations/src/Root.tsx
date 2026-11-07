@@ -5,6 +5,7 @@ import { ArchitectureDiagram, ArchitectureDiagramProps } from './compositions/Ar
 import { KineticMetricCounter, KineticMetricCounterProps } from './compositions/KineticMetricCounter';
 import { TweetCard3D, TweetCard3DProps } from './compositions/TweetCard3D';
 import { PersistentHookBanner, PersistentHookBannerProps } from './compositions/PersistentHookBanner';
+import { DocumentZoom, DocumentZoomProps } from './compositions/DocumentZoom';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -48,6 +49,15 @@ export const RemotionRoot: React.FC = () => {
       <Composition<PersistentHookBannerProps>
         id="PersistentHookBanner"
         component={PersistentHookBanner}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<DocumentZoomProps>
+        id="DocumentZoom"
+        component={DocumentZoom}
         durationInFrames={120}
         fps={30}
         width={1080}

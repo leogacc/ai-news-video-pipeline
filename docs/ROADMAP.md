@@ -542,6 +542,7 @@ flowchart LR
   2. Phase 1 (0–2s): Wide framed shot establishing the credible source banner (*Euronews*, *Fortune*, *arXiv*).
   3. Phase 2 (2–5s): Camera zooms in dynamically ($1.0\times \to 1.4\times$) onto the exact sentence being vocalized.
   4. Phase 3: An animated translucent Cyber Yellow highlighter pen draws across the key words synchronously with TTS audio.
+* **Status:** **Complete (2026-11-06)** — Built `DocumentZoom.tsx` in Remotion with targeted spring scaling ($1.0x \to 1.32x$) and animated Cyber Yellow highlighter sweep (`rgba(255, 235, 59, 0.32)`). Registered in `Root.tsx` and bridged via `animations.render_document_zoom()`. Unit tests passing 3/3 in `pipeline/test_document_zoom.py`.
 
 ### Objective 11.2: Interactive Live CLI & Code Execution Simulator (`TerminalRunner.tsx`)
 * **Goal:** Turn code and architecture explanations into live, interactive developer drama.
