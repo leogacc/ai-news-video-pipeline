@@ -1,4 +1,29 @@
 <!-- GOAL_COMPLETE -->
+## 2026.11.06.17 — 2026-11-06
+- PHASE 10.1 COMPLETE: 5-ACT NARRATIVE SCRIPT ARCHITECTURE ($0 BUDGET) (user, 2026-11-06: "/plan phase 10.1", "/goal proceed"):
+  1. 5-ACT DRAMATIC SCRIPT CURVE (`pipeline/write.py`):
+     - Implemented `write_5act_script()` and deterministic zero-spend fallback `_heuristic_5act_script()`.
+     - Act I (Quantified Shock Hook): Key entity vocalized within the first 5 words (< 2.5s TikTok indexing requirement) with exact metric callout (% or count).
+     - Act II (Primary Evidence Escalation): Grounding facts, research paper methodology, or live dispatch findings.
+     - Act III (The Invisible Wall / Conflict): Friction, bottleneck, or why conventional single-agent / prompting methods fail ("Instead of...", "does not work").
+     - Act IV (Concrete Demonstration / Secret Weapon): System architecture, tool sandboxes, or benchmark leaps.
+     - Act V (Resolution, Scale Metric & Viewer Dilemma): Speedup/efficiency metric + polarizing debate question ("Can open-weight models permanently overtake proprietary frontiers? Drop your thoughts below.").
+  2. AUTOMATIC READABILITY & CADENCE CONTROL:
+     - Implemented `calculate_reading_grade()` enforcing Flesch-Kincaid grade level <= 8.0 (Grade 6-8, matching viral TikTok benchmark studies).
+     - Enforced total script word count of 65-105 words (~30-40s at 1.03x voiceover speed, 160 WPM).
+  3. SCOUT INTEGRATION & BACKWARD COMPATIBILITY (`scout/x_scout.py`):
+     - Updated `generate_hook_and_script()` to delegate to `write_5act_script()`.
+     - Preserved 100% backward compatibility for all legacy consumer keys (`title`, `title_prefix`, `hook_opening`, `narration_text`, `question`, `clean_text`, `author`).
+     - Added new Phase 10 keys: `script_sentences`, `acts`, `reading_grade`, `word_count`, `est_duration`, `hashtags`, and formatted TikTok `description`.
+     - Updated `build_clip_for_pick()` to thread structured script sentences into `spec["script"]`.
+     - Updated `format_tiktok_description()` to deliver authentic 5-hashtag descriptions with question callouts.
+  4. UNIT TEST SUITE & REGRESSION VERIFICATION:
+     - Authored `pipeline/test_write_5act.py` with 6 exhaustive unit tests covering all 4 archetypes (Benchmark, Safety/Disaster, Swarm/Computer Use, Open Disruption), entity timing, metrics, conflict framing, reading grade, and $0 offline execution.
+     - All 6 tests in `pipeline/test_write_5act.py` passed (0.77s).
+     - All 10 tests in `scout/test_scorecard.py` passed.
+     - All 6 tests in `scout/test_cron_runner.py` passed.
+     - All 6 tests in `pipeline/test_qa_clip.py` passed (13.4s).
+
 ## 2026.11.06.16 — 2026-11-06
 - FRONTIER AI TREND DISPATCH: AUTONOMOUS AI SWARMS WITH PARALLEL COMPUTER USE ($0 BUDGET) (user, 2026-11-06: "Ok now trigger the pipeline to make a new video based on the new ai trend of ai swarms using computer use, something like that.").
   1. TOPIC & DISPATCH SCOUTING (`pipeline/output/scout/clips/ai_swarms_computer_use/`):

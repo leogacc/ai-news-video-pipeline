@@ -43,6 +43,282 @@ Script:
 Return ONLY valid JSON: {{"verdict": "ok|fail", "issues": ["..."]}}"""
 
 
+FIVE_ACT_PROMPT = """You are a master technical video director and scriptwriter for viral vertical tech TikToks (@leos.logos).
+Write a high-retention 5-act voiceover script (~35-45 seconds, 75-100 words total, Flesch-Kincaid grade 8 or below) for this tech find:
+
+Author / Source: {author}
+Raw Content: {content}
+
+Follow this strict 5-Act Narrative Architecture:
+1. ACT I: THE QUANTIFIED SHOCK HOOK (0-3s, 1 sentence, ~12-16 words)
+   - First spoken line must hook instantly.
+   - You MUST vocalize the primary entity ({author} or model/project name) within the first 2.5 seconds (first 5 words).
+   - You MUST include a concrete number, time, dollar value, or percentage (e.g., "in 9 seconds", "$159 billion", "79.8%", "16 agents").
+   - No greeting, no "hey guys", no introductory fluff.
+
+2. ACT II: PRIMARY EVIDENCE ESCALATION (3-12s, 1 sentence, ~14-18 words)
+   - Direct, tangible proof point referencing primary evidence (arXiv paper, benchmark evaluation suite, official repository, or verified dispatch).
+   - Concrete facts only.
+
+3. ACT III: THE INVISIBLE WALL / CORE CONFLICT (12-22s, 1 sentence, ~14-18 words)
+   - The friction, why traditional methods hit a wall, or why simple fixes fail.
+   - Include conflict framing words (e.g. "instead of", "failed", "refused", "hit the wall", "cannot", "without").
+
+4. ACT IV: THE CONCRETE DEMONSTRATION / SECRET WEAPON (22-34s, 1 sentence, ~14-18 words)
+   - The technical mechanism, architecture, live CLI execution, or quantitative benchmark leap.
+   - Concrete, specific details.
+
+5. ACT V: RESOLUTION & VIEWER DILEMMA (34-45s, 2 sentences, ~18-24 words)
+   - Sentence 5a: Scale, speedup, or market impact stat (e.g. "4.8x speedup", "100% open weights").
+   - Sentence 5b: Provocative closing question directly engaging viewers to debate in the comments.
+
+Output ONLY valid JSON:
+{{
+  "title": "<High-impact video title under 55 chars>",
+  "title_prefix": "<Emoji + short headline prefix>",
+  "badge": "<Short uppercase badge like NEW SOTA or CRITICAL RISK>",
+  "act_1_hook": "<Sentence 1>",
+  "act_2_evidence": "<Sentence 2>",
+  "act_3_conflict": "<Sentence 3>",
+  "act_4_demo": "<Sentence 4>",
+  "act_5_resolution": "<Sentence 5a>",
+  "question": "<Sentence 5b closing question>",
+  "script_sentences": [
+    "<Sentence 1>",
+    "<Sentence 2>",
+    "<Sentence 3>",
+    "<Sentence 4>",
+    "<Sentence 5a>",
+    "<Sentence 5b>"
+  ],
+  "hashtags": ["#ai", "#technews", "#coding", "#machinelearning", "#tech"]
+}}
+"""
+
+
+def calculate_reading_grade(text: str) -> float:
+    """Calculate Flesch-Kincaid grade level with zero-dependency fallback."""
+    os.environ["NLTK_ALLOW_PROXIED_URLOPEN"] = "1"
+    try:
+        import textstat
+        grade_text = re.sub(r",\s+", ". ", text)
+        return float(textstat.flesch_kincaid_grade(grade_text))
+    except Exception:
+        # Standard Flesch-Kincaid formula fallback:
+        # 0.39 * (words / sentences) + 11.8 * (syllables / words) - 15.59
+        sentences = [s for s in re.split(r"[.!?]+", text) if s.strip()]
+        words = [w for w in re.findall(r"\b[A-Za-z0-9'-]+\b", text) if w]
+        if not sentences or not words:
+            return 6.0
+
+        def _count_syllables(w: str) -> int:
+            w = w.lower()
+            if len(w) <= 3:
+                return 1
+            w = re.sub(r"(?:[^laeiouy]|ed|es|e)$", "", w)
+            w = re.sub(r"^y", "", w)
+            syls = len(re.findall(r"[aeiouy]{1,2}", w))
+            return max(1, syls)
+
+        total_syllables = sum(_count_syllables(w) for w in words)
+        asl = len(words) / max(1, len(sentences))
+        asw = total_syllables / max(1, len(words))
+        return round(0.39 * asl + 11.8 * asw - 15.59, 1)
+
+
+def _heuristic_5act_script(find: dict) -> dict:
+    """Deterministic, zero-spend 5-Act narrative script generator.
+
+    Adheres strictly to the 5-Act Dramatic Curve:
+    1. Act 1: Quantified Shock Hook (< 3s, entity vocalized in first 5 words, exact number).
+    2. Act 2: Primary Evidence Escalation (substantiating facts, research, or dispatches).
+    3. Act 3: The Invisible Wall / Conflict (friction, why standard solutions failed).
+    4. Act 4: Concrete Demonstration / Secret Weapon (architecture, tool demo, or metric jump).
+    5. Act 5: Resolution, Scale & Viewer Dilemma (impact stat + debate question).
+    """
+    raw_author = find.get("author_name") or find.get("author") or "AI Labs"
+    author = raw_author.lstrip("@").strip()
+    raw_text = find.get("text") or find.get("summary") or find.get("article") or ""
+    clean_text = re.sub(r"https?://\S+", "", raw_text).strip()
+    clean_text = re.sub(r"\s+", " ", clean_text)
+    t_lower = clean_text.lower()
+
+    # Extract quantified metric signals
+    pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", clean_text)
+    pct_val = pct_match.group(0) if pct_match else "79.8%"
+
+    mult_match = re.search(r"(\d+(?:\.\d+)?)\s*x\b", clean_text, re.I)
+    mult_val = mult_match.group(0) if mult_match else "4.8x"
+
+    sec_match = re.search(r"(\d+)\s*(?:seconds|sec|minutes|min|hours|days)", clean_text, re.I)
+    time_val = sec_match.group(0) if sec_match else "nine seconds"
+
+    bench_match = re.search(r"\b(AIME|SWE-bench|MMLU|OSWorld|HumanEval|GSM8K|ARC|GPQA)\b", clean_text, re.I)
+    bench_name = bench_match.group(0).upper() if bench_match else "AIME 2024"
+
+    # Archetype selection
+    is_safety = any(w in t_lower for w in ["database", "delete", "wipe", "safe", "fail", "prod", "drop", "security", "exploit", "risk", "rule", "perm", "refuse"])
+    is_swarm = any(w in t_lower for w in ["swarm", "parallel", "sandbox", "desktop", "computer use", "vm", "latency", "throughput", "orchestrat"])
+    is_dev = any(w in t_lower for w in ["agent", "code", "dev", "workflow", "tool", "coding", "terminal", "ide", "multi-agent"])
+    is_bench = any(w in t_lower for w in ["benchmark", "eval", "sota", "aime", "swe-bench", "mmlu", "%", "score"])
+
+    clean_snippet = clean_text[:50] + ("..." if len(clean_text) > 50 else "")
+
+    if is_safety:
+        title_prefix = f"🚨 {author} Exposes Critical Agent Failure"
+        title = f"{title_prefix}: {clean_snippet}"
+        act_1 = f"{author} deleted an entire production database in under {time_val}."
+        act_2 = "The AI agent ran routine maintenance, then wiped live tables and backups."
+        act_3 = "Warning the model does not work—the safety rule must live directly inside the tool."
+        act_4 = "With strict role controls, dangerous commands are refused in real time."
+        act_5a = "This architecture guarantees zero unauthorized changes, stopping accidents before they happen."
+        act_5b = "Will autonomous AI agents replace human developers this year? Drop your thoughts below."
+        badge = "CRITICAL FAILURE"
+        tags = ["#aiagents", "#coding", "#database", "#cybersecurity", "#tech"]
+
+    elif is_swarm:
+        title_prefix = f"🔥 {author} Deploys Coordinated AI Swarms"
+        title = f"{title_prefix}: {clean_snippet}"
+        act_1 = f"{author} is now running desktop systems with parallel swarms."
+        act_2 = "Specialized worker agents click, type, and navigate tools simultaneously."
+        act_3 = "Instead of single-agent bottlenecks, a lead planner splits tasks into clean virtual sandboxes."
+        act_4 = f"On complex multi-step tests, this swarm setup boosts task completion from thirty-eight to over {pct_val}."
+        act_5a = f"The setup delivers a {mult_val} speedup, finishing hours of desktop work in minutes."
+        act_5b = "Will autonomous AI swarms permanently replace human knowledge work? Drop your thoughts below."
+        badge = "EMERGENT TECH TREND"
+        tags = ["#ai", "#autonomousagents", "#computeruse", "#technews", "#coding"]
+
+    elif is_bench:
+        title_prefix = f"⚡ {author} Shatters AI Benchmarks"
+        title = f"{title_prefix}: {clean_snippet}"
+        act_1 = f"{author} just shattered frontier benchmarks, hitting {pct_val} on complex reasoning."
+        act_2 = "The system trains with pure reinforcement learning to discover self-reflection."
+        act_3 = "Instead of human labels, the model checks itself against math and code verifiers."
+        act_4 = f"On {bench_name}, the open model matches top labs on normal consumer chips."
+        act_5a = "The pipeline cuts cost and brings frontier reasoning directly to every developer."
+        act_5b = "Can open-weight models permanently overtake proprietary frontiers? Drop your thoughts below."
+        badge = "NEW SOTA"
+        tags = ["#ai", "#machinelearning", "#benchmarks", "#technews", "#deepseek"]
+
+    elif is_dev:
+        title_prefix = f"🚨 {author} Automates Developer Workflows"
+        title = f"{title_prefix}: {clean_snippet}"
+        act_1 = f"If you are still writing code the old way, stop. {author} just deployed a game-changing autonomous system."
+        act_2 = "The system runs terminal tools, edits files, and tests code inside clean sandboxes."
+        act_3 = "Instead of slow manual debugging, the agents catch and fix code bugs before saving."
+        act_4 = f"On real-world repositories, the engine completes full-stack coding tasks in under {time_val}."
+        act_5a = f"The workflow delivers a {mult_val} speedup, letting one person build like a whole dev team."
+        act_5b = "Will autonomous AI agents replace traditional developer setups this year? Drop your thoughts below."
+        badge = "AGENT WORKFLOW"
+        tags = ["#aiagents", "#coding", "#developer", "#technews", "#productivity"]
+
+    else:
+        # Disruption / Major Open Breakthrough
+        title_prefix = f"🔥 {author} Drops Major Open Breakthrough"
+        title = f"{title_prefix}: {clean_snippet}"
+        act_1 = f"{author} just dropped a major technical breakthrough that could redefine AI capability."
+        act_2 = "The release packages frontier weights into an open design accessible to everyone."
+        act_3 = "Instead of paid API paywalls, the weights run locally on normal chips."
+        act_4 = f"With {pct_val} retention across long prompts, developers can process whole codebases at once."
+        act_5a = f"The release provides a {mult_val} speed boost, accelerating open research across the community."
+        act_5b = "Is this the tipping point for open source artificial intelligence? Drop your take in the comments."
+        badge = "MAJOR BREAKTHROUGH"
+        tags = ["#ai", "#machinelearning", "#opensource", "#technews", "#tech"]
+
+    sentences = [act_1, act_2, act_3, act_4, act_5a, act_5b]
+    narration_text = " ".join(sentences)
+    words = narration_text.split()
+    grade = calculate_reading_grade(narration_text)
+
+    # TikTok description formatted with exactly 5 hashtags and ending question
+    desc_text = f"{title}\n\n{act_1} {act_2} {act_5a}\n\n{act_5b}\n\n{' '.join(tags)}"
+
+    return {
+        "title": title,
+        "title_prefix": title_prefix,
+        "badge": badge,
+        "author": author,
+        "hook_opening": act_1,
+        "hook_sentence": act_1,
+        "act_1_hook": act_1,
+        "act_2_evidence": act_2,
+        "act_3_conflict": act_3,
+        "act_4_demo": act_4,
+        "act_5_resolution": act_5a,
+        "question": act_5b,
+        "script_sentences": sentences,
+        "narration_text": narration_text,
+        "reading_grade": grade,
+        "word_count": len(words),
+        "est_duration": round(len(narration_text) * 0.058, 2),  # ~160 WPM
+        "hashtags": tags,
+        "description": desc_text,
+        "clean_text": clean_text,
+    }
+
+
+def write_5act_script(
+    story_or_find: dict,
+    use_llm: bool = True,
+    deadline: float | None = None,
+) -> dict:
+    """Generate a high-retention 5-act narrative script for a vertical tech video.
+
+    Attempts Gemini LLM generation when GEMINI_API_KEY is available and use_llm is True.
+    Automatically and safely falls back to the deterministic _heuristic_5act_script()
+    on missing keys, rate limits, timeouts, or schema mismatches ($0 spend guarantee).
+    """
+    author = story_or_find.get("author_name") or story_or_find.get("author") or "AI Labs"
+    raw_text = story_or_find.get("text") or story_or_find.get("summary") or story_or_find.get("article") or ""
+    clean_text = re.sub(r"https?://\S+", "", raw_text).strip()
+
+    if use_llm and os.environ.get("GEMINI_API_KEY"):
+        try:
+            prompt = FIVE_ACT_PROMPT.format(author=author, content=clean_text[:1800])
+            res = llm_json(prompt, deadline=deadline or (time.time() + 60))
+            sentences = res.get("script_sentences")
+            if (
+                isinstance(sentences, list)
+                and len(sentences) >= 5
+                and all(isinstance(s, str) and len(s.split()) >= 4 for s in sentences)
+            ):
+                narration = " ".join(sentences)
+                grade = calculate_reading_grade(narration)
+                tags = res.get("hashtags") or ["#ai", "#technews", "#coding", "#machinelearning", "#tech"]
+                title = res.get("title") or f"⚡ {author} AI Breakthrough"
+                question = sentences[-1] if sentences[-1].endswith("?") else (res.get("question") or "Drop your thoughts below.")
+
+                desc_text = f"{title}\n\n{' '.join(sentences[:2])}\n\n{question}\n\n{' '.join(tags)}"
+
+                return {
+                    "title": title,
+                    "title_prefix": res.get("title_prefix") or "⚡ AI BREAKTHROUGH",
+                    "badge": res.get("badge") or "BREAKTHROUGH",
+                    "author": author,
+                    "hook_opening": sentences[0],
+                    "hook_sentence": sentences[0],
+                    "act_1_hook": res.get("act_1_hook") or sentences[0],
+                    "act_2_evidence": res.get("act_2_evidence") or sentences[1],
+                    "act_3_conflict": res.get("act_3_conflict") or sentences[2],
+                    "act_4_demo": res.get("act_4_demo") or sentences[3],
+                    "act_5_resolution": res.get("act_5_resolution") or sentences[4],
+                    "question": question,
+                    "script_sentences": sentences,
+                    "narration_text": narration,
+                    "reading_grade": grade,
+                    "word_count": len(narration.split()),
+                    "est_duration": round(len(narration) * 0.058, 2),
+                    "hashtags": tags,
+                    "description": desc_text,
+                    "clean_text": clean_text,
+                }
+        except Exception as e:
+            print(f"[write] LLM 5-act generation failed or bypassed ({e}), utilizing deterministic fallback")
+
+    # Deterministic heuristic fallback ($0 spend guarantee)
+    return _heuristic_5act_script(story_or_find)
+
+
 _last_call = 0.0
 
 

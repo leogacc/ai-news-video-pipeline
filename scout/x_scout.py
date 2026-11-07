@@ -29,6 +29,8 @@ import animations
 import assemble
 import publish
 import qa
+import write
+from write import write_5act_script
 
 
 def load_env_file():
@@ -230,58 +232,17 @@ def excitement_gate_score(item: dict) -> tuple[bool, str, dict]:
 
 
 def generate_hook_and_script(item: dict) -> dict:
-    """Generate punchy short-form editorial script with 3 dynamic TikTok hook archetypes.
+    """Generate punchy short-form editorial script following the Phase 10 5-Act Narrative Architecture.
 
     Guarantees:
-    1. Key entity/creator is vocalized within the first 2.5 seconds (< 6 words into narration).
-    2. Zero AP-wire boilerplate ('{author} announced: ... code available now.').
-    3. Archetype selection:
-       - Benchmark Clash (evals/scores/sota/numbers)
-       - Direct Stakes / Loss Aversion (tools/agents/coding/workflows)
-       - Disruption / Breakthrough (general breakthroughs/papers/models)
-    4. Punchy debate question ending to drive comment section retention.
+    1. Act 1: Quantified Shock Hook (< 3s, entity vocalized in first 5 words, exact number).
+    2. Act 2: Primary Evidence Escalation (substantiating facts, research, or dispatches).
+    3. Act 3: The Invisible Wall / Conflict (friction, why standard solutions failed).
+    4. Act 4: Concrete Demonstration / Secret Weapon (architecture, tool demo, or metric jump).
+    5. Act 5: Resolution, Scale & Viewer Dilemma (impact stat + debate question).
+    6. Zero AP-wire boilerplate ('{author} announced: ... code available now.').
     """
-    author = item.get("author_name") or f"@{item.get('author', 'AI')}"
-    raw_text = item.get("text", "")
-    clean_text = re.sub(r"https?://\S+", "", raw_text).strip()
-    clean_text = re.sub(r"\s+", " ", clean_text)
-    t_lower = clean_text.lower()
-
-    words = clean_text.split()
-    narration_body = " ".join(words[:40]) if len(words) > 40 else clean_text
-    if narration_body and not narration_body.endswith((".", "!", "?")):
-        narration_body += "."
-
-    # 1. Benchmark Clash: Underdog / Open vs Frontier
-    if any(w in t_lower for w in ["benchmark", "eval", "sota", "aime", "swe-bench", "mmlu", "%", "score"]):
-        title_prefix = f"⚡ {author} Shatters AI Benchmarks"
-        hook_opening = f"{author} just shattered frontier benchmarks with a breakthrough open release."
-        question = "Can open-weight models permanently overtake proprietary frontiers? Drop your thoughts below."
-
-    # 2. Direct Stakes / Loss Aversion: Workflows, Coding, Agents
-    elif any(w in t_lower for w in ["agent", "code", "dev", "workflow", "tool", "coding", "terminal", "ide", "multi-agent"]):
-        title_prefix = f"🚨 {author} Automates Developer Workflows"
-        hook_opening = f"If you are still writing code the old way, stop. {author} just dropped a game-changing autonomous system."
-        question = "Will autonomous AI agents replace traditional developer setups this year? Let us know what you think."
-
-    # 3. Disruption / Breakthrough: General Paradigm Shift / Paper
-    else:
-        title_prefix = f"🔥 {author} Drops Major Open Breakthrough"
-        hook_opening = f"{author} just dropped a major technical breakthrough that could redefine AI capability."
-        question = "Is this the tipping point for open source artificial intelligence? Drop your take in the comments."
-
-    title_text = f"{title_prefix}: {clean_text[:55]}..." if len(clean_text) > 55 else f"{title_prefix}: {clean_text}"
-    narration_text = f"{hook_opening} {narration_body} {question}"
-
-    return {
-        "title": title_text,
-        "title_prefix": title_prefix,
-        "hook_opening": hook_opening,
-        "narration_text": narration_text,
-        "question": question,
-        "clean_text": clean_text,
-        "author": author,
-    }
+    return write_5act_script(item)
 
 
 class XScout:
@@ -532,18 +493,21 @@ class XScout:
         """Format 5-clause TikTok description with exactly 5 hashtags."""
         editorial = generate_hook_and_script(item)
         title = editorial["title"]
-        summary = editorial["hook_opening"]
+        summary = editorial.get("hook_opening") or editorial.get("act_1_hook")
         question = editorial["question"]
         source_url = item.get("url") or f"https://x.com/{item.get('author', '')}/status/{item.get('post_id', '')}"
-        tags = ["#ai", "#technews", "#machinelearning", "#coding", "#tech"]
+        tags = editorial.get("hashtags") or ["#ai", "#technews", "#machinelearning", "#coding", "#tech"]
 
-        desc = (
-            f"{title}\n"
-            f"Source: {source_url}\n\n"
-            f"{summary}\n\n"
-            f"{question}\n\n"
-            f"{' '.join(tags)}"
-        )
+        if editorial.get("description"):
+            desc = f"{editorial['description']}\n\nSource: {source_url}"
+        else:
+            desc = (
+                f"{title}\n"
+                f"Source: {source_url}\n\n"
+                f"{summary}\n\n"
+                f"{question}\n\n"
+                f"{' '.join(tags)}"
+            )
         return {
             "title": title,
             "description": desc,
@@ -796,6 +760,7 @@ class XScout:
             "title": title_text,
             "bio": bio_text,
             "narration": narration_text,
+            "script": editorial.get("script_sentences") or [narration_text],
             "shots": shots,
         }
 
