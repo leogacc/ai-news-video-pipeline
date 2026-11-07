@@ -1,10 +1,10 @@
 # AI News Video Pipeline — Master Technical Roadmap
 
-> **Pipeline Version:** `2026.11.06.13`  
+> **Pipeline Version:** `2026.11.06.16`  
 > **Brand & Distribution:** `@leos.logos`  
 > **Repository:** `github.com/leogacc/ai-news-video-pipeline`  
 > **Author:** Antigravity (Pair Programming with User / Creative Director)  
-> **Status:** Active Engineering 🚀 (Phases 1–8 Complete ✅; TikTok 200-View Jail Breakout & Terminal Polish Deployed)  
+> **Status:** Active Engineering 🚀 (Phases 1–9 Complete ✅; Adding Phases 10 & 11: Next-Gen Viral Director Engine)  
 
 ---
 
@@ -403,7 +403,163 @@ flowchart LR
 
 ---
 
-## 9. Future Horizons & Backlog (Paused Subsystems)
+## 9. Phase 8: TikTok Pacing, Male Studio Voice & Glassmorphic Terminal Window ($0 Budget)
+
+```mermaid
+flowchart LR
+    subgraph P8 ["Phase 8: Voice, Terminal & Collision Rectification"]
+        VOICE["8.1 Male Studio Voice\n(en-US-Studio-Q @ 1.03x ~160 WPM)"]
+        PADDING["8.2 Remotion Golden-Zone Padding\n(paddingTop: 190, Zero Collisions)"]
+        GLASS_TERM["8.3 Glassmorphic Terminal Window\n(box_top=1170, macOS Traffic Lights)"]
+        SFX_ONLY["8.4 Pure SFX Mix\n(-14.4 LUFS, Music Disabled)"]
+    end
+    VOICE --> PADDING --> P8_EXIT{"Phase 8 Exit Gate"}
+    GLASS_TERM --> SFX_ONLY --> P8_EXIT
+```
+
+### Objective 8.1: Male Studio Voice Rectification & TikTok Pacing
+* **Root Cause & Fix:** Replaced `en-US-Studio-O` with `en-US-Studio-Q` (Google Cloud male Studio voice) at `speaking_rate: 1.03` (~160 WPM, matching MKBHD/Cleo Abram tech explainer pacing) under the free-tier quota ($0.00 spend).
+* **Audio Track:** Defaulted soundtrack to pure SFX-only dynamic audio bed normalized to -14.4 LUFS (EBU R128), eliminating background music distraction per user direction.
+
+### Objective 8.2: Remotion Safe-Zone & Zero-Collision Recalibration
+* **Recalibration:** Reduced top padding across all 4 Remotion compositions from `paddingTop: 260` to `paddingTop: 190`. 
+* **Zero Collision:** Eliminated collision between the lightning bolt callout pill (`⚡ MATCHES OPENAI O1-PREVIEW`) and horizontal axis numbers on `BenchmarkLadder`. The entire visual hierarchy comfortably fits in $y = 190 \dots 1000$, well above the terminal window ($y = 1170 \dots 1420$).
+
+### Objective 8.3: Glassmorphic Terminal Window & Progressive Typewriter
+* **Console Overlay:** Implemented `build_terminal_window_overlay()` in `pipeline/clip_frames.py` rendering a dark frosted console box with glowing cyan borders and authentic macOS/Linux traffic light control dots (`● ● ●`).
+* **Progressive Typewriter:** Spoken words reveal progressively with trailing neon green block cursor `█`.
+
+### Phase 8 Exit Criteria — ALL COMPLETE ✅
+- [x] Official male Studio voice `en-US-Studio-Q` active at 1.03x with Kokoro `am_echo` offline fallback.
+- [x] Zero collisions across Remotion charts; visual content centered in TikTok golden zone ($y = 190 \dots 1000$).
+- [x] Glassmorphic terminal window overlay composited with traffic lights and glowing borders.
+- [x] Pure SFX mix normalized to -14.4 LUFS without music bed.
+
+---
+
+## 10. Phase 9: 3-Line Teletype Terminal Engine, Highlight Removal & Primary Research Evidence
+
+```mermaid
+flowchart LR
+    subgraph P9 ["Phase 9: 3-Line Teletype & Primary Research Evidence"]
+        GLITCH["9.1 Highlight Glitch Removal\n(Purge static SVG stroke from TweetCard3D)"]
+        TELETYPE["9.2 3-Line Teletype Engine\n(box_top=1150, 10-14 words, D/N steps)"]
+        PRIMARY["9.3 Primary Evidence Integration\n(arXiv Fig 2, VM Desktop Telemetry)"]
+    end
+    GLITCH --> TELETYPE --> PRIMARY --> P9_EXIT{"Phase 9 Exit Gate"}
+```
+
+### Objective 9.1: 00:02 Highlight Glitch Removal
+* **Problem Statement:** In `pipeline/animations/src/compositions/TweetCard3D.tsx`, a hardcoded fixed-percentage yellow SVG stroke overlay (`top: 48%`) sliced across paragraph text at second 2.
+* **Fix:** Completely purged static SVG sweep from `TweetCard3D.tsx`, preserving clean 3D perspective spring entrance (`rotateX(8°)` $\to$ `0°`) and ambient hover oscillation.
+
+### Objective 9.2: 3-Line Teletype Terminal Captions Engine
+* **Console Box Geometry:** Expanded terminal console to `box_top = 1150`, `box_height = 275` ($y = 1150 \dots 1425$, `MarginV = 1205`), providing 230px of vertical client text space.
+* **Phrase Accumulation:** Natural phrase wrapping up to 3 stacked lines (~10–14 words) before screen clearing.
+* **Per-Character Teletype Typing Head:** Each word is subdivided into character micro-steps ($D / N$). Letters type out sequentially in Cyber Yellow (`#FFE600`), trailed by the Neon Green block cursor (`█`), solidifying into Neon Green (`#39FF14`) as speech progresses.
+
+### Objective 9.3: Primary Research & Visual Evidence Integration
+* **arXiv & Telemetry Extraction:** Extracted high-resolution Figure 2 (*"The multi-stage pipeline of DeepSeek-R1"*) from arXiv:2501.12948 and generated 4-worker headless desktop VM telemetry visual (`swarm_sandboxes_visual.png`), anchoring technical claims with primary proof.
+
+### Phase 9 Exit Criteria — ALL COMPLETE ✅
+- [x] Hardcoded yellow SVG highlight glitch completely removed from `TweetCard3D.tsx`.
+- [x] 3-line terminal console box verified on both Pillow overlays and ASS subtitles.
+- [x] Character-by-character progressive teletype typing effect verified with green block cursor `█`.
+- [x] High-resolution primary evidence assets integrated into flagship storyboards.
+- [x] All 20 automated QA assertions passed (`qa.json`).
+
+---
+
+## 11. Phase 10: Next-Gen Viral Director Engine — Act-Structured Storytelling & Micro-Cut Pacing (Immediate / Next Up)
+
+> **Strategic Directive:** Learnings derived from forensic analysis of viral tech TikToks (`@alonsonetwork` 96K plays; `@theventure` 237K plays, 22K likes). Transform the automated pipeline director from a linear explainer into an aggressive, high-retention cinematic storytelling engine.
+
+```mermaid
+flowchart TD
+    subgraph P10 ["Phase 10: Next-Gen Viral Director Engine"]
+        ACTS["10.1 5-Act Narrative Architecture\n(write.py Prompt Redesign)"]
+        MICRO["10.2 Micro-Cut Storyboard\n(2.5s-3.5s ASL, 8-14 Cuts/Clip)"]
+        HOOK_PILL["10.3 Persistent Visual Hook Banner\n(High-Contrast Silent Scroller Anchor)"]
+        INTERRUPT["10.4 Pattern Interrupts & Pop Culture\n(1.5s Meme / B-Roll Cuts at 75% Mark)"]
+    end
+    ACTS --> MICRO --> HOOK_PILL --> INTERRUPT --> P10_EXIT{"Phase 10 Exit Gate"}
+```
+
+### Objective 10.1: 5-Act Narrative Script Architecture (`pipeline/write.py`)
+* **Problem Statement:** Current scripts follow descriptive wire-service formats (*"Here is what happened, here is the architecture, here is the benchmark"*), causing early drop-offs.
+* **Technical Specification:** Redesign script generation in `pipeline/write.py` to enforce the **5-Act Dramatic Curve**:
+  1. **Act I: The Quantified Shock Hook (0–3s):** High-stakes, extreme premise paired with an exact number (*"An AI agent deleted a database in 9 seconds"* / *"Turned a college side project into a $159B company"*).
+  2. **Act II: Primary Evidence Escalation (3–12s):** Rapid-fire proof points referencing mainstream journalists, arXiv papers, or VIP dispatches with zero fluff.
+  3. **Act III: The Invisible Wall / Core Conflict (12–22s):** Why standard solutions fail (*"A better prompt won't help"* / *"Taking payments online meant weeks of bank paperwork"*).
+  4. **Act IV: The Concrete Demonstration / Secret Weapon (22–34s):** Live artifact showcase (real JSON config, CLI execution, or benchmark jump).
+  5. **Act V: Resolution, Scale & Viewer Dilemma (34–45s):** Massive market impact stat + provocative debate question triggering comment-section engagement.
+
+### Objective 10.2: High-Velocity Micro-Cut Storyboard (2.5s–3.5s ASL)
+* **Problem Statement:** Current clips hold shots for 7.0s to 18.5s. In short-form video feeds, visual stillness $>4.0$s triggers viewer abandonment.
+* **Technical Specification:**
+  1. Update `pipeline/assemble.py` and `scout/x_scout.py` to target **8 to 14 micro-cuts** per 30–45s clip (Average Shot Length: **2.5s – 3.5s**).
+  2. Enforce the **Rule of 3.5 Seconds**: No visual scene may remain static for more than 4.0 seconds without a camera move, document zoom, or ticker event.
+
+### Objective 10.3: Persistent Visual Hook Banner Component
+* **Technical Specification:**
+  1. Build `PersistentHookBanner` in Remotion / Pillow: a high-contrast white rounded banner with bold black typography (`Montserrat ExtraBold`) rendered in Shot 0 and Shot 1.
+  2. Acts as a persistent visual headline for the 70%+ of users scrolling their TikTok feeds on mute.
+
+### Objective 10.4: Pattern Interrupts & Memetic Re-engagement
+* **Technical Specification:**
+  1. Implement an automated **Pattern Interrupt** injection at the 70%–80% mark of each video (e.g. 1.2s – 1.8s cultural movie clip, founder lore image, or dramatic kinetic typography statement).
+  2. Resets viewer cognitive fatigue right before the climactic benchmark and ending call-to-action.
+
+### Phase 10 Exit Criteria
+- [ ] `pipeline/write.py` produces 5-act dramatic scripts with quantified opening hooks.
+- [ ] Storyboard generator outputs 8–14 micro-shots with 2.5s–3.5s ASL.
+- [ ] Persistent high-contrast hook banner rendered across Shots 0 and 1.
+- [ ] Pattern interrupt injected at 75% mark without violating delivery specs.
+- [ ] Full automated QA gate pass and verified Telegram review queue delivery.
+
+---
+
+## 12. Phase 11: Dynamic Proof, Evidence Zoom & Interactive Code/Tension HUDs (Planned)
+
+```mermaid
+flowchart LR
+    subgraph P11 ["Phase 11: Evidence Zoom & Interactive HUDs"]
+        DOC_ZOOM["11.1 DocumentZoom Engine\n(Headline -> Zoom Paragraph + Highlight)"]
+        CLI_RUN["11.2 TerminalRunner Simulator\n(Live Bash typing, AST output, Refusal)"]
+        TENSION_HUD["11.3 Tension & Metric HUDs\n(StopwatchTicker 0->9s, $159B Pill)"]
+    end
+    DOC_ZOOM --> CLI_RUN --> TENSION_HUD --> P11_EXIT{"Phase 11 Exit Gate"}
+```
+
+### Objective 11.1: DocumentZoom Engine (`pipeline/animations/src/compositions/DocumentZoom.tsx`)
+* **Goal:** Instead of displaying a static capture of an article or paper, smoothly direct viewer focus to the smoking gun quote.
+* **Technical Specification:**
+  1. Remotion composition taking a screenshot of an article, paper, or tweet.
+  2. Phase 1 (0–2s): Wide framed shot establishing the credible source banner (*Euronews*, *Fortune*, *arXiv*).
+  3. Phase 2 (2–5s): Camera zooms in dynamically ($1.0\times \to 1.4\times$) onto the exact sentence being vocalized.
+  4. Phase 3: An animated translucent Cyber Yellow highlighter pen draws across the key words synchronously with TTS audio.
+
+### Objective 11.2: Interactive Live CLI & Code Execution Simulator (`TerminalRunner.tsx`)
+* **Goal:** Turn code and architecture explanations into live, interactive developer drama.
+* **Technical Specification:**
+  1. Render realistic macOS / Linux IDE and terminal sessions inside the glassmorphic window.
+  2. Simulate typing commands character-by-character (`$ noorm db`), displaying real-time colored stdout/stderr streams and bold permission rejection badges (`[REFUSED: DROP TABLE BLOCKED]`).
+
+### Objective 11.3: Dynamic Tension & Metric HUD Widgets
+* **Technical Specification:**
+  1. **StopwatchTicker:** Animated red/orange elapsed time counter (`0.0s → 9.0s`) for disaster and speedup narratives.
+  2. **CurrencyTicker / GrowthPill:** Dropping/pulsing metric badges (`$159 BILLION`, `+36.2% OVER BASELINE`).
+  3. Integrated within the safe-zone boundaries without clipping the terminal captions or header titles.
+
+### Phase 11 Exit Criteria
+- [ ] `DocumentZoom` Remotion composition renders smooth scale transitions and synchronized highlighter sweeps.
+- [ ] `TerminalRunner` renders authentic CLI simulations with interactive error badges.
+- [ ] Reusable HUD widgets (`StopwatchTicker`, `CurrencyTicker`) verified on live assembly runs.
+- [ ] Regression test suite passing 100%.
+
+---
+
+## 13. Future Horizons & Backlog (Paused Subsystems)
 
 The following capabilities are maintained in the codebase in a paused state and will remain inactive until prioritized:
 
@@ -417,9 +573,7 @@ The following capabilities are maintained in the codebase in a paused state and 
 
 ---
 
-## 10. Operational Summary & Implementation Sequence
-
-The roadmap now encompasses the complete journey from initial environment bootstrapping to scaling TikTok reach:
+## 14. Operational Summary & Implementation Sequence
 
 ```
 [Phase 1: Bootstrapping & Spikes] ✅ COMPLETE
@@ -442,6 +596,18 @@ The roadmap now encompasses the complete journey from initial environment bootst
 
 [Phase 7: Production Polish & Springs] ✅ COMPLETE
   └── Remotion spring physics, 3D TweetCard, transition SFX, Webpack bundle caching
+
+[Phase 8: Voice & Terminal Polish] ✅ COMPLETE
+  └── Male Studio voice en-US-Studio-Q @ 1.03x, safe padding, glassmorphic terminal
+
+[Phase 9: 3-Line Teletype & Primary Evidence] ✅ COMPLETE
+  └── 3-line teletype terminal engine, highlight glitch removal, arXiv primary figures
+
+[Phase 10: Next-Gen Viral Director Engine] 🚀 ACTIVE / NEXT UP
+  └── 5-Act narrative arc, 2.5s-3.5s micro-cuts, persistent hook pill, pattern interrupts
+
+[Phase 11: Dynamic Proof, Evidence Zoom & HUDs] 📋 PLANNED
+  └── DocumentZoom engine, TerminalRunner CLI simulator, Stopwatch & Metric HUDs
 ```
 
 
