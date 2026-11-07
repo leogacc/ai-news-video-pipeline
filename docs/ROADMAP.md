@@ -493,6 +493,7 @@ flowchart TD
   3. **Act III: The Invisible Wall / Core Conflict (12–22s):** Why standard solutions fail (*"A better prompt won't help"* / *"Taking payments online meant weeks of bank paperwork"*).
   4. **Act IV: The Concrete Demonstration / Secret Weapon (22–34s):** Live artifact showcase (real JSON config, CLI execution, or benchmark jump).
   5. **Act V: Resolution, Scale & Viewer Dilemma (34–45s):** Massive market impact stat + provocative debate question triggering comment-section engagement.
+* **Status:** **Complete (2026-11-06)** — Codified in `write_5act_script()` and `_heuristic_5act_script()` supporting Benchmark Clash, Safety/Disaster, Swarms, and Open Disruption archetypes with guaranteed first-word entity vocalization, <= 8.0 Flesch-Kincaid reading grade, and 6-sentence drama. Unit tests passing 6/6 in `pipeline/test_write_5act.py`.
 
 ### Objective 10.2: High-Velocity Micro-Cut Storyboard (2.5s–3.5s ASL)
 * **Problem Statement:** Current clips hold shots for 7.0s to 18.5s. In short-form video feeds, visual stillness $>4.0$s triggers viewer abandonment.
@@ -504,6 +505,7 @@ flowchart TD
 * **Technical Specification:**
   1. Build `PersistentHookBanner` in Remotion / Pillow: a high-contrast white rounded banner with bold black typography (`Montserrat ExtraBold`) rendered in Shot 0 and Shot 1.
   2. Acts as a persistent visual headline for the 70%+ of users scrolling their TikTok feeds on mute.
+* **Status:** **Complete (2026-11-06)** — Implemented `build_persistent_hook_banner()` in `pipeline/clip_frames.py` and `PersistentHookBanner.tsx` in Remotion. Automated FFmpeg overlay compositing across Shots 0 and 1 via `assemble.py`. Unit tests passing 4/4 in `pipeline/test_hook_banner.py`.
 
 ### Objective 10.4: Pattern Interrupts & Memetic Re-engagement
 * **Technical Specification:**
@@ -511,9 +513,9 @@ flowchart TD
   2. Resets viewer cognitive fatigue right before the climactic benchmark and ending call-to-action.
 
 ### Phase 10 Exit Criteria
-- [ ] `pipeline/write.py` produces 5-act dramatic scripts with quantified opening hooks.
+- [x] `pipeline/write.py` produces 5-act dramatic scripts with quantified opening hooks.
 - [ ] Storyboard generator outputs 8–14 micro-shots with 2.5s–3.5s ASL.
-- [ ] Persistent high-contrast hook banner rendered across Shots 0 and 1.
+- [x] Persistent high-contrast hook banner rendered across Shots 0 and 1.
 - [ ] Pattern interrupt injected at 75% mark without violating delivery specs.
 - [ ] Full automated QA gate pass and verified Telegram review queue delivery.
 

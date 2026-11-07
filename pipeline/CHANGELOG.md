@@ -1,4 +1,22 @@
-<!-- GOAL_COMPLETE -->
+## 2026.11.06.18 — 2026-11-06
+- PHASE 10.2 COMPLETE: HOOK VELOCITY & PERSISTENT KINETIC HOOK BANNER ($0 BUDGET) (user, 2026-11-06: "Execute all remaining sub-phases in Phase 10 (10.2, 10.3, 10.4) and Phase 11 sub phases sequentially to completion"):
+  1. PERSISTENT HOOK BANNER ENGINE (`pipeline/clip_frames.py`):
+     - Implemented `build_persistent_hook_banner()` generating transparent 1080x1920 RGBA overlays.
+     - High-contrast brilliant white rounded pill (`#FFFFFF`, radius=24) with soft drop shadow (`rgba(0, 0, 0, 0.38)`) for immediate eye capture on muted feeds.
+     - Bold uppercase black typography (`#0A0E16`) with dynamic multi-tier auto-fitting (28-36pt single-line, or 2-line balanced wrapping for long titles).
+     - Confined strictly to the top safe zone ($y \in [240, 350]$ px), safely below TikTok top navigation tabs ($y \le 220$ px) and well clear of the lower terminal window ($y \ge 1150$ px).
+  2. REMOTION PERSISTENT HOOK BANNER (`pipeline/animations/src/compositions/PersistentHookBanner.tsx`):
+     - Created React composition with snappy spring physics (`damping: 14, stiffness: 120`).
+     - Registered in `pipeline/animations/src/Root.tsx`.
+  3. COMPOSITOR & TIMING INTEGRATION (`pipeline/assemble.py`, `scout/x_scout.py`):
+     - In `assemble.py`, integrated persistent hook banner compositing across Shot 0 and Shot 1 via FFmpeg `enable='between(t,0,banner_end_t)'`.
+     - Preserves viewer context across initial micro-cuts for up to 7.5 seconds before transitioning into deeper evidence.
+     - Updated `scout/x_scout.py:build_clip_for_pick()` to thread `hook_banner` and `title_prefix` into clip specifications.
+  4. UNIT TEST SUITE & VERIFICATION:
+     - Authored `pipeline/test_hook_banner.py` validating 1080x1920 RGBA canvas, safe-zone bounding box ($235 \le y \le 365$), auto-wrapping, and badge prepending.
+     - 4/4 tests passing in `pipeline/test_hook_banner.py` (0.02s).
+     - All 16 unit tests passing across `pipeline/test_write_5act.py` and `scout/test_scorecard.py`.
+
 ## 2026.11.06.17 — 2026-11-06
 - PHASE 10.1 COMPLETE: 5-ACT NARRATIVE SCRIPT ARCHITECTURE ($0 BUDGET) (user, 2026-11-06: "/plan phase 10.1", "/goal proceed"):
   1. 5-ACT DRAMATIC SCRIPT CURVE (`pipeline/write.py`):

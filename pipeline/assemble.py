@@ -802,37 +802,82 @@ class ClipAssembler:
             terminal_overlay_png = self.work_dir / "terminal_overlay.png"
             terminal_overlay_img.save(str(terminal_overlay_png))
 
+            # Persistent hook banner (Phase 10.2: Hook Velocity across Shots 0 and 1)
+            banner_text = self.spec.get("hook_banner") or self.spec.get("title_prefix") or self.spec.get("title") or ""
+            banner_png = None
+            if banner_text:
+                banner_img = clip_frames.build_persistent_hook_banner(banner_text)
+                banner_png = self.work_dir / "hook_banner.png"
+                banner_img.save(str(banner_png))
+
+            banner_end_t = min(7.5, sum(durations[:2]) if len(durations) >= 2 else (durations[0] if durations else 4.0))
+
             term_video = self.work_dir / "concat_with_terminal.mp4"
-            cmd_overlay = [
-                FFMPEG,
-                "-y",
-                "-i",
-                str(concat_video),
-                "-loop",
-                "1",
-                "-i",
-                str(terminal_overlay_png),
-                "-filter_complex",
-                "[0:v][1:v]overlay=0:0:shortest=1[v]",
-                "-map",
-                "[v]",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-crf",
-                "18",
-                "-pix_fmt",
-                "yuv420p",
-                "-r",
-                "30",
-                str(term_video),
-            ]
+            if banner_png and banner_png.exists():
+                filter_desc = (
+                    f"[0:v][1:v]overlay=0:0:shortest=1[base];"
+                    f"[base][2:v]overlay=0:0:enable='between(t,0,{banner_end_t:.3f})'[v]"
+                )
+                cmd_overlay = [
+                    FFMPEG,
+                    "-y",
+                    "-i",
+                    str(concat_video),
+                    "-loop",
+                    "1",
+                    "-i",
+                    str(terminal_overlay_png),
+                    "-loop",
+                    "1",
+                    "-i",
+                    str(banner_png),
+                    "-filter_complex",
+                    filter_desc,
+                    "-map",
+                    "[v]",
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "veryfast",
+                    "-crf",
+                    "18",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-r",
+                    "30",
+                    str(term_video),
+                ]
+            else:
+                cmd_overlay = [
+                    FFMPEG,
+                    "-y",
+                    "-i",
+                    str(concat_video),
+                    "-loop",
+                    "1",
+                    "-i",
+                    str(terminal_overlay_png),
+                    "-filter_complex",
+                    "[0:v][1:v]overlay=0:0:shortest=1[v]",
+                    "-map",
+                    "[v]",
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "veryfast",
+                    "-crf",
+                    "18",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-r",
+                    "30",
+                    str(term_video),
+                ]
             subprocess.run(cmd_overlay, check=True, capture_output=True)
             concat_with_terminal = term_video
-            logger.info("Terminal console window overlay composited -> %s", concat_with_terminal)
+            logger.info("Terminal window and persistent hook banner overlays composited -> %s", concat_with_terminal)
         except Exception as e:
-            logger.warning("Terminal overlay compositing failed; falling back to raw video: %s", e)
+            logger.warning("Terminal/banner overlay compositing failed; falling back to raw video: %s", e)
             concat_with_terminal = concat_video
 
         # 5. Generate terminal typewriter .ass captions

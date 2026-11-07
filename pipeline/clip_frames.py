@@ -277,3 +277,89 @@ def build_terminal_window_overlay(
 
     return overlay
 
+
+def build_persistent_hook_banner(
+    text: str,
+    badge: str = "",
+    width: int = 960,
+    height: int = 110,
+    y_top: int = 240,
+) -> Image.Image:
+    """Generate a transparent 1080x1920 RGBA overlay featuring a high-contrast persistent hook banner.
+
+    Visual characteristics:
+    - High-contrast brilliant white rounded pill (#FFFFFF) with 24px corner radius.
+    - Subtle drop shadow (rgba(0, 0, 0, 0.38)) for sharp separation against any background footage.
+    - Bold uppercase black typography (#0A0E16) dynamically auto-fitted (28-36pt).
+    - Top safe-zone positioning (y: 240..350) safely below TikTok navigation header (y <= 220).
+    - Designed to persist across Shot 0 and Shot 1 to hook users scrolling on mute.
+    """
+    overlay = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    x0 = (1080 - width) // 2
+    x1 = x0 + width
+    y0 = y_top
+    y1 = y0 + height
+
+    # Soft drop shadow
+    draw.rounded_rectangle([x0, y0 + 6, x1 - 1, y1 + 5], radius=24, fill=(0, 0, 0, 95))
+
+    # Brilliant white rounded pill
+    draw.rounded_rectangle(
+        [x0, y0, x1 - 1, y1 - 1],
+        radius=24,
+        fill=(255, 255, 255, 252),
+        outline=(225, 230, 240, 255),
+        width=2,
+    )
+
+    font_path = TITLE_FONT if os.path.exists(TITLE_FONT) else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    clean_text = text.strip()
+    if badge and not clean_text.startswith(badge):
+        clean_text = f"{badge} {clean_text}"
+
+    max_text_w = width - 60
+    font_size = 36
+    try:
+        font = ImageFont.truetype(font_path, font_size)
+    except Exception:
+        font = ImageFont.load_default()
+
+    tw = draw.textlength(clean_text, font=font)
+    while tw > max_text_w and font_size > 28:
+        font_size -= 2
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+            tw = draw.textlength(clean_text, font=font)
+        except Exception:
+            break
+
+    if tw <= max_text_w:
+        tx = x0 + (width - tw) // 2
+        bbox = draw.textbbox((0, 0), clean_text, font=font)
+        th = bbox[3] - bbox[1]
+        ty = y0 + (height - th) // 2 - bbox[1]
+        draw.text((tx, ty), clean_text, font=font, fill=(10, 14, 22, 255))
+    else:
+        # Wrap into 2 balanced lines
+        words = clean_text.split()
+        mid = len(words) // 2
+        line1 = " ".join(words[:mid])
+        line2 = " ".join(words[mid:])
+        try:
+            f2 = ImageFont.truetype(font_path, 26)
+        except Exception:
+            f2 = font
+        lh = 32
+        total_th = lh * 2
+        ty = y0 + (height - total_th) // 2
+        for ln in (line1, line2):
+            w = draw.textlength(ln, font=f2)
+            tx = x0 + (width - w) // 2
+            draw.text((tx, ty), ln, font=f2, fill=(10, 14, 22, 255))
+            ty += lh
+
+    return overlay
+
+

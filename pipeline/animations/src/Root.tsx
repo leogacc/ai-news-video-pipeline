@@ -4,6 +4,7 @@ import { BenchmarkLadder, BenchmarkLadderProps } from './compositions/BenchmarkL
 import { ArchitectureDiagram, ArchitectureDiagramProps } from './compositions/ArchitectureDiagram';
 import { KineticMetricCounter, KineticMetricCounterProps } from './compositions/KineticMetricCounter';
 import { TweetCard3D, TweetCard3DProps } from './compositions/TweetCard3D';
+import { PersistentHookBanner, PersistentHookBannerProps } from './compositions/PersistentHookBanner';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -38,6 +39,15 @@ export const RemotionRoot: React.FC = () => {
       <Composition<TweetCard3DProps>
         id="TweetCard3D"
         component={TweetCard3D}
+        durationInFrames={120}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{}}
+      />
+      <Composition<PersistentHookBannerProps>
+        id="PersistentHookBanner"
+        component={PersistentHookBanner}
         durationInFrames={120}
         fps={30}
         width={1080}

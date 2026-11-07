@@ -758,6 +758,8 @@ class XScout:
 
         spec = {
             "title": title_text,
+            "title_prefix": editorial.get("title_prefix") or title_text,
+            "hook_banner": editorial.get("title_prefix") or title_text,
             "bio": bio_text,
             "narration": narration_text,
             "script": editorial.get("script_sentences") or [narration_text],
