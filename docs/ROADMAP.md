@@ -557,8 +557,8 @@ flowchart LR
   3. Integrated within the safe-zone boundaries without clipping the terminal captions or header titles.
 
 ### Phase 11 Exit Criteria
-- [ ] `DocumentZoom` Remotion composition renders smooth scale transitions and synchronized highlighter sweeps.
-- [ ] `TerminalRunner` renders authentic CLI simulations with interactive error badges.
+- [x] `DocumentZoom` Remotion composition renders smooth scale transitions and synchronized highlighter sweeps.
+- [x] `TerminalRunner` renders authentic CLI simulations with interactive error badges.
 - [ ] Reusable HUD widgets (`StopwatchTicker`, `CurrencyTicker`) verified on live assembly runs.
 - [ ] Regression test suite passing 100%.
 

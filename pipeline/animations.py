@@ -36,6 +36,7 @@ SUPPORTED_COMPOSITIONS = {
     "TweetCard3D",
     "PersistentHookBanner",
     "DocumentZoom",
+    "TerminalRunner",
 }
 
 
@@ -299,6 +300,41 @@ def render_document_zoom(
     }
     return render_animation(
         composition="DocumentZoom",
+        props=props,
+        output_path=output_path,
+        duration_frames=duration_frames,
+    )
+
+
+def render_terminal_runner(
+    command: str,
+    output_path: Union[str, Path],
+    typing_duration_frames: int = 30,
+    stdout_lines: Optional[List[Dict[str, str]]] = None,
+    refusal_badge: str = "REFUSED: DROP TABLE BLOCKED",
+    is_refusal: bool = True,
+    badge: str = "LIVE CLI SIMULATION",
+    title: str = "TERMINAL EXECUTION & RULE REFUSAL",
+    subtitle: str = "Deterministic Tool-Level Safety Guardrails",
+    source: str = "Source: Live Tool Execution Trace",
+    duration_frames: int = 120,
+) -> Path:
+    """Renders a TerminalRunner composition showing animated CLI typing and live tool rule refusal."""
+    props: Dict[str, Any] = {
+        "command": command,
+        "typingDurationFrames": typing_duration_frames,
+        "refusalBadge": refusal_badge,
+        "isRefusal": is_refusal,
+        "badge": badge,
+        "title": title,
+        "subtitle": subtitle,
+        "source": source,
+    }
+    if stdout_lines is not None:
+        props["stdoutLines"] = stdout_lines
+
+    return render_animation(
+        composition="TerminalRunner",
         props=props,
         output_path=output_path,
         duration_frames=duration_frames,
