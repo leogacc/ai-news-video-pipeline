@@ -752,6 +752,11 @@ class XScout:
                 evidence_src = str(ev_card)
                 evidence_type = "still"
 
+            interrupt_img = ROOT / "pipeline" / "assets" / "pattern_interrupts" / "wait_for_it.png"
+            if not interrupt_img.exists():
+                interrupt_img = out_dir / f"interrupt_{top_item.get('post_id', 'find')}.png"
+                clip_frames.build_pattern_interrupt_card(interrupt_img, "WAIT FOR IT...", "PATTERN INTERRUPT")
+
             if est_audio_dur < 14.0:
                 # 4-5 micro-shots for short clips (< 14s)
                 if evidence_src:
@@ -760,7 +765,7 @@ class XScout:
                 shots.append(_make_benchmark_ladder(2.8))
                 shots.append(_make_telemetry("auto"))
             elif est_audio_dur < 24.0:
-                # 6-7 micro-shots for medium clips (14-23s, ASL ~2.8s)
+                # 7-8 micro-shots for medium clips (14-23s, ASL ~2.7s)
                 if evidence_src:
                     shots.append({"type": evidence_type, "src": evidence_src, "duration": 2.6})
                 shots.append(_make_arch_diagram(2.8))
@@ -771,10 +776,12 @@ class XScout:
                 else:
                     shots.append({"type": "still", "src": str(card_file), "duration": 2.5})
                 shots.append(_make_benchmark_ladder(2.8))
+                # Pattern Interrupt injection at ~70% mark
+                shots.append({"type": "still", "src": str(interrupt_img), "duration": 1.4, "badge": "PATTERN INTERRUPT"})
                 shots.append(_make_telemetry(2.8))
                 shots.append(_make_arch_diagram("auto"))
             else:
-                # 8-11 micro-shots for 24-45s full 5-act clips (ASL ~2.9s)
+                # 9-12 micro-shots for 24-45s full 5-act clips (ASL ~2.8s)
                 if evidence_src:
                     shots.append({"type": evidence_type, "src": evidence_src, "duration": 2.6})
                 shots.append(_make_arch_diagram(2.8))
@@ -788,6 +795,8 @@ class XScout:
                 if ev_card.exists():
                     shots.append({"type": "still", "src": str(ev_card), "duration": 2.6})
                 shots.append(_make_telemetry(2.8))
+                # Pattern Interrupt injection at ~70-75% mark (resets dopamine before climactic conclusion)
+                shots.append({"type": "still", "src": str(interrupt_img), "duration": 1.4, "badge": "PATTERN INTERRUPT"})
                 shots.append(_make_arch_diagram(2.8))
                 shots.append(_make_benchmark_ladder(2.8))
                 shots.append(_make_telemetry("auto"))

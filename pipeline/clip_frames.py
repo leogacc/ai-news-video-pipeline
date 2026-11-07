@@ -413,4 +413,49 @@ def build_terminal_evidence_card(
     return out_path
 
 
+def build_pattern_interrupt_card(
+    out_path: str | Path,
+    headline: str = "WAIT FOR IT...",
+    subline: str = "PATTERN INTERRUPT",
+    theme: str = "glitch",
+) -> Path:
+    """Generate a high-contrast chromatic aberration glitch card (960x600) for pattern interrupt cuts.
+
+    Resets viewer cognitive fatigue at the 75% video mark before the climactic benchmark and CTA.
+    """
+    out_path = Path(out_path)
+    img = Image.new("RGB", (960, 600), color=(8, 10, 18))
+    draw = ImageDraw.Draw(img)
+
+    # Chromatic aberration glitch border
+    draw.rounded_rectangle([(14, 14), (954, 594)], radius=20, outline=(255, 0, 85), width=2)
+    draw.rounded_rectangle([(8, 8), (948, 588)], radius=20, outline=(0, 242, 254), width=2)
+    draw.rounded_rectangle([(10, 10), (950, 590)], radius=20, outline=(255, 255, 255), width=1)
+
+    font_path = TITLE_FONT if os.path.exists(TITLE_FONT) else "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    try:
+        f_badge = ImageFont.truetype(font_path, 18)
+        f_head = ImageFont.truetype(font_path, 44)
+        f_sub = ImageFont.truetype(font_path, 20)
+    except Exception:
+        f_badge = ImageFont.load_default()
+        f_head = ImageFont.load_default()
+        f_sub = ImageFont.load_default()
+
+    # Badge pill
+    draw.rounded_rectangle([(360, 75), (600, 120)], radius=12, fill=(255, 0, 85))
+    draw.text((480, 97), subline, font=f_badge, fill=(255, 255, 255), anchor="mm")
+
+    # Headline with glitch shadow
+    draw.text((482, 282), headline, font=f_head, fill=(255, 0, 85), anchor="mm")
+    draw.text((478, 278), headline, font=f_head, fill=(0, 242, 254), anchor="mm")
+    draw.text((480, 280), headline, font=f_head, fill=(255, 255, 255), anchor="mm")
+
+    # Subtext
+    draw.text((480, 420), "RESETTING COGNITIVE ATTENTION", font=f_sub, fill=(160, 180, 205), anchor="mm")
+    img.save(str(out_path))
+    return out_path
+
+
+
 

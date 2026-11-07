@@ -309,7 +309,11 @@ def generate_sfx_track(
         # Milestone sound effects for animated graphics and tweet cards
         shot = shots_spec[i] if i < len(shots_spec) else {}
         shot_type = shot.get("type", "")
-        if shot_type in ("remotion", "tweet_card"):
+        if shot_type == "pattern_interrupt" or shot.get("badge") == "PATTERN INTERRUPT":
+            # Visceral sub-bass drop & whoosh on pattern interrupt re-engagement
+            mix_in(bass, t_cursor + 0.05)
+            mix_in(whoosh, t_cursor - 0.05)
+        elif shot_type in ("remotion", "tweet_card"):
             # Deep sub-bass drop on hero entry
             mix_in(bass, t_cursor + 0.10)
             # Snappy tactile tick on takeaway highlight or metric reveal at 1.2s

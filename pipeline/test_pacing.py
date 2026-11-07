@@ -92,7 +92,8 @@ class TestMicroCutPacing(unittest.TestCase):
                         3.5,
                         f"Shot {i} ({s.get('type')}) duration {dur}s exceeds 3.5s ceiling",
                     )
-                    self.assertGreaterEqual(dur, 1.8)
+                    min_dur = 1.2 if s.get("badge") == "PATTERN INTERRUPT" else 1.8
+                    self.assertGreaterEqual(dur, min_dur)
 
             # Calculate Average Shot Length
             explicit_durations = [s["duration"] for s in shots if s["duration"] != "auto"]
